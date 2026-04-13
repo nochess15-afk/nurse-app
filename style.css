@@ -553,6 +553,8 @@
   /* スマホ最適化 */
   @media (max-width: 600px) {
     .header h1 { font-size: 16px; }
+    .header { padding: 8px 12px; }
+    .header-inner { gap: 8px; }
     .main { padding: 14px 12px 60px; }
     .card { padding: 14px; }
     .btn { font-size: 13px; padding: 10px 16px; }
@@ -560,6 +562,10 @@
     [style*="grid-template-columns:120px 1fr 180px"] {
       grid-template-columns: 80px 1fr 120px !important;
     }
+  }
+
+  @media (max-width: 400px) {
+    .header-inner { gap: 6px; }
   }
 .vital-input::-webkit-outer-spin-button,
 .vital-input::-webkit-inner-spin-button {
