@@ -562,10 +562,15 @@
     [style*="grid-template-columns:120px 1fr 180px"] {
       grid-template-columns: 80px 1fr 120px !important;
     }
+    /* ヘッダー：サブタイトル非表示、ロゴ縮小、右側コンパクト化 */
+    .header-subtitle { display: none; }
+    .header-logo { height: 42px !important; width: 42px !important; }
   }
 
   @media (max-width: 400px) {
+    .header { padding: 7px 10px; }
     .header-inner { gap: 6px; }
+    .header-logo { height: 36px !important; width: 36px !important; }
   }
 .vital-input::-webkit-outer-spin-button,
 .vital-input::-webkit-inner-spin-button {
