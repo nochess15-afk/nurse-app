@@ -1,7 +1,6 @@
 // ===== 設定 =====
 const SUPABASE_URL = 'https://cktxrkkeqdazcvamphhh.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNrdHhya2tlcWRhemN2YW1waGhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzNDU1MTYsImV4cCI6MjA4OTkyMTUxNn0.DlCMM0_Qu4qNSZ6znekMEmvXHXSU6QAD1wvyFFEIX78';
-const CLAUDE_KEY = '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';
 const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
 const CLAUDE_MODEL_FAST = 'claude-haiku-4-5-20251001';
 
@@ -113,14 +112,9 @@ async function callClaude(systemPrompt, userPrompt, useFast) {
   // APIに送る前に匿名化
   var anonUserPrompt = anonymize(userPrompt);
   var model = useFast ? CLAUDE_MODEL_FAST : CLAUDE_MODEL;
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+  const res = await fetch('/.netlify/functions/claude', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': CLAUDE_KEY,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true'
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: model,
       max_tokens: 2000,
@@ -1097,14 +1091,9 @@ async function analyzeMedicinePhoto() {
 
     var mediaType = file.type || 'image/jpeg';
 
-    var response = await fetch('https://api.anthropic.com/v1/messages', {
+    var response = await fetch('/.netlify/functions/claude', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': CLAUDE_KEY,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: CLAUDE_MODEL_FAST,
         max_tokens: 1000,
@@ -1611,14 +1600,9 @@ async function sendChatMessage() {
     var messages = [{ role: 'user', content: contextMsg }, { role: 'assistant', content: '了解しました。修正のご指示をどうぞ。' }];
     window.assessmentChatHistory.forEach(function(m) { messages.push(m); });
 
-    var res = await fetch('https://api.anthropic.com/v1/messages', {
+    var res = await fetch('/.netlify/functions/claude', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': CLAUDE_KEY,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: CLAUDE_MODEL_FAST, max_tokens: 1000, system: systemPrompt, messages: messages })
     });
     var data = await res.json();
@@ -2149,15 +2133,7 @@ async function analyzeDocument() {
       contentBlock = { type: 'image', source: { type: 'base64', media_type: imgMediaType, data: docFileData } };
     }
 
-    var headers = {
-      'Content-Type': 'application/json',
-      'x-api-key': CLAUDE_KEY,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true'
-    };
-    if (docFileType === 'pdf') {
-      headers['anthropic-beta'] = 'pdfs-2024-09-25';
-    }
+    // ヘッダーはNetlify Functions側で設定（PDFベータはusePdfBetaフラグで渡す）
 
     var response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -3313,9 +3289,9 @@ async function sendGeneralChat() {
   msgs.scrollTop = msgs.scrollHeight;
   generalChatHistory.push({ role: 'user', content: msg });
   try {
-    var res = await fetch('https://api.anthropic.com/v1/messages', {
+    var res = await fetch('/.netlify/functions/claude', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': CLAUDE_KEY, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: CLAUDE_MODEL, max_tokens: 800,
         system: 'あなたは経験豊富な訪問看護師・看護教育者です。看護・医療・リハビリに関する質問に専門的かつわかりやすく答えてください。簡潔に。',
@@ -3476,14 +3452,9 @@ async function sendNursingChat() {
     // 会話履歴を構築
     var messages = nursingChatHistory.slice(-10); // 直近10件
 
-    var res = await fetch('https://api.anthropic.com/v1/messages', {
+    var res = await fetch('/.netlify/functions/claude', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': CLAUDE_KEY,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: CLAUDE_MODEL,
         max_tokens: 1000,
