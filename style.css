@@ -82,7 +82,7 @@
     background: var(--surface);
     border-bottom: 2px solid var(--border);
     position: sticky;
-    top: 64px; /* header: padding 10px×2 + logo 44px = 64px */
+    top: 80px; /* header: padding 10px×2 + logo 60px = 80px */
     z-index: 90;
     box-shadow: var(--shadow);
   }
