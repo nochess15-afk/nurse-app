@@ -885,7 +885,7 @@ async function getDiseaseItemsAI(diagnosis) {
 
   try {
     var result = await callClaude(
-      'あなたは経験豊富な訪問看護師です。指定された疾患・病態に対して、訪問看護で確認すべき観察項目を8〜12個生成してください。JSON形式のみで回答：{"disease":"疾患名（短く）","items":["観察項目1","観察項目2",...]}',
+      'あなたは経験豊富な訪問看護師です。指定された疾患・病態に対して、訪問看護（在宅の場）で確認すべき観察項目を8〜12個生成してください。医学的観察に加え、日常生活動作（ADL）・生活環境・本人の意向・家族サポート・QOLに関連する在宅ならではの視点も含めてください。JSON形式のみで回答：{"disease":"疾患名（短く）","items":["観察項目1","観察項目2",...]}',
       '疾患名：' + diagnosis,
       true
     );
@@ -1475,14 +1475,14 @@ async function generateAssessment() {
     // 今日入力中の記録も取得
     var todayRecord = document.getElementById('visit-content').value.trim();
 
-    var patientInfo = '【患者情報】\n氏名：' + currentPatient.name + '（' + (currentPatient.age||'不明') + '歳・' + (currentPatient.gender||'不明') + '）\n主病名：' + (currentPatient.main_diagnosis||'') + '\n既往歴：' + (currentPatient.medical_history||'') + '\n医療処置：' + (currentPatient.medical_procedures||'') + '\nADL：' + (currentPatient.adl||'') + '\n内服薬：' + (currentPatient.medicines||'なし');
+    var patientInfo = '【患者情報】\n氏名：' + currentPatient.name + '（' + (currentPatient.age||'不明') + '歳・' + (currentPatient.gender||'不明') + '）\n主病名：' + (currentPatient.main_diagnosis||'') + '\n既往歴：' + (currentPatient.medical_history||'') + '\n医療処置：' + (currentPatient.medical_procedures||'') + '\nADL：' + (currentPatient.adl||'') + '\n内服薬：' + (currentPatient.medicines||'なし') + '\n特記事項（生活背景・家族・介護状況等）：' + (currentPatient.notes||'');
 
     var userContent = patientInfo +
       (todayRecord ? '\n\n【本日の記録（入力中）】\n' + todayRecord : '') +
       '\n\n【過去の訪問記録（直近10件）】\n' + (visitText || '記録なし');
 
     const result = await callClaude(
-      'あなたは訪問看護師の臨床判断を支援するAIです。以下の構成で出力してください。\n\n【記録の校正（O情報のみ）】\nSOAPのO（客観的情報）に該当する部分のみ、誤字脱字・重複表現・読みにくい句読点だけ修正して出力する。S（主観的情報）は校正しない。内容の追加・削除・要約は絶対にしない。原文に忠実に。\n\n【判断を支援する根拠】\n観察事実に関連するエビデンス・臨床的な意味を2〜3点、「〜とされています」「〜の可能性があります」という表現で記載する\n\n【A欄の記載例（参考）】\n看護師が使える表現を1〜2文で簡潔に提示する\n\nAIが判断・断定はしない。看護師の思考を補足する支援ツールとして機能すること。',
+      'あなたは訪問看護師の臨床判断を支援するAIです。在宅看護の文脈で「その人らしい生活を支える」という視点を大切にしてください。以下の構成で出力してください。\n\n【記録の校正（O情報のみ）】\nSOAPのO（客観的情報）に該当する部分のみ、誤字脱字・重複表現・読みにくい句読点だけ修正して出力する。S（主観的情報）は校正しない。内容の追加・削除・要約は絶対にしない。原文に忠実に。\n\n【判断を支援する根拠】\n観察事実に関連するエビデンス・臨床的な意味を2〜3点、「〜とされています」「〜の可能性があります」という表現で記載する。在宅生活への影響・本人や家族への意味も視野に入れること。\n\n【A欄の記載例（参考）】\n在宅・その人中心の視点（本人の意向・強み・残存機能・生活背景・QOL）を反映した表現を1〜2文で簡潔に提示する。疾患管理だけでなく、その人の望む暮らしや生活目標との関連も含めること。\n\nAIが判断・断定はしない。看護師の思考を補足する支援ツールとして機能すること。',
       userContent
     );
 
@@ -1554,7 +1554,7 @@ async function generateEvidence() {
       : '';
 
     var result = await callClaude(
-      'あなたは看護教育の専門家です。訪問看護師のアセスメント内容をもとに、その医学的・看護学的根拠とエビデンスをわかりやすく説明してください。以下の形式で出力してください：\n\n【根拠】\n・アセスメントの各ポイントの医学的根拠を箇条書きで3〜5点\n\n【参考ガイドライン・エビデンス】\n・関連するガイドラインや研究知見を2〜3点\n\n【看護のポイント】\n・このアセスメントをもとに看護師が注意すべき実践的なポイントを2〜3点\n\n専門用語は使いつつも読みやすく。',
+      'あなたは看護教育の専門家です。訪問看護師のアセスメント内容をもとに、その医学的・看護学的根拠とエビデンスをわかりやすく説明してください。在宅ケア・その人中心ケア（Person-Centred Care）の視点を踏まえ、以下の形式で出力してください：\n\n【根拠】\n・アセスメントの各ポイントの医学的根拠を箇条書きで3〜5点\n\n【参考ガイドライン・エビデンス】\n・関連するガイドラインや研究知見を2〜3点\n\n【在宅看護のポイント】\n・生活の場での実践・本人の意向や強みの活用・家族支援・QOL維持の観点から、看護師が注意すべき実践的なポイントを2〜3点\n\n専門用語は使いつつも読みやすく。',
       '【アセスメント内容】\n' + assessment + '\n\n【患者情報】\n' + patientInfo
     );
 
@@ -1593,7 +1593,7 @@ async function sendChatMessage() {
   try {
     // 現在のSOAP記録を取得
     var visitContent = document.getElementById('visit-content').value;
-    var systemPrompt = 'あなたは訪問看護師の記録を支援するAIです。看護師が書いた内容をリスペクトしながら、指示に従って修正・整理してください。断定的な表現は避け「〜の可能性があります」「〜が示唆されます」など支援的な表現を使ってください。エビデンスに基づいた根拠を添えつつ、最終判断は看護師が行うという立場で記載してください。修正後の文章のみを出力してください。';
+    var systemPrompt = 'あなたは訪問看護師の記録を支援するAIです。在宅看護・その人中心ケアの視点を大切にし、看護師が書いた内容をリスペクトしながら指示に従って修正・整理してください。断定的な表現は避け「〜の可能性があります」「〜が示唆されます」など支援的な表現を使ってください。エビデンスに基づいた根拠を添えつつ、最終判断は看護師が行うという立場で記載してください。本人の意向・生活背景・残存機能・QOLへの影響も意識した表現を心がけてください。修正後の文章のみを出力してください。';
     var contextMsg = '【現在の訪問記録】\n' + visitContent + '\n\n【現在のアセスメント】\n' + (window.currentAssessment || '');
 
     // 会話履歴を構築
