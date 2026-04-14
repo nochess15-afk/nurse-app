@@ -3173,25 +3173,39 @@ async function deletePatient(btn) {
 }
 
 // ===== スケジュール管理 =====
+// ローカル日付を YYYY-MM-DD 文字列で返す（UTC変換しない）
+function localDateStr(d) {
+  d = d || new Date();
+  return d.getFullYear() + '-' +
+    String(d.getMonth() + 1).padStart(2, '0') + '-' +
+    String(d.getDate()).padStart(2, '0');
+}
+
 // 表示中の日付（デフォルト：今日）
-window.scheduleViewDate = new Date().toISOString().split('T')[0];
+window.scheduleViewDate = localDateStr();
 
 function formatScheduleDateLabel(dateStr) {
-  var today = new Date().toISOString().split('T')[0];
-  var d = new Date(dateStr + 'T00:00:00');
+  var todayStr = localDateStr();
+  // タイムゾーンずれを避けるためローカルコンストラクタで生成
+  var parts = dateStr.split('-');
+  var d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+  var todayParts = todayStr.split('-');
+  var todayD = new Date(parseInt(todayParts[0]), parseInt(todayParts[1]) - 1, parseInt(todayParts[2]));
   var mm = d.getMonth() + 1;
   var dd = d.getDate();
   var weeks = ['日','月','火','水','木','金','土'];
   var dow = weeks[d.getDay()];
-  var diff = Math.round((new Date(dateStr) - new Date(today)) / 86400000);
+  var diff = Math.round((d - todayD) / 86400000);
   var label = diff === -1 ? '昨日' : diff === 0 ? '今日' : diff === 1 ? '明日' : '';
   return (label ? label + ' ' : '') + mm + '/' + dd + '（' + dow + '）';
 }
 
 function scheduleNavDate(offset) {
-  var d = new Date(window.scheduleViewDate + 'T00:00:00');
+  // ローカル日付パーツから生成してUTC変換を回避
+  var parts = window.scheduleViewDate.split('-');
+  var d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
   d.setDate(d.getDate() + offset);
-  window.scheduleViewDate = d.toISOString().split('T')[0];
+  window.scheduleViewDate = localDateStr(d);
   loadTodaySchedule();
 }
 
