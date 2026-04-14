@@ -1196,7 +1196,6 @@ function renderVisits() {
     html += '<div class="visit-date-label">📅 ' + (v.visit_date || '') + '</div>';
     html += '<div style="display:flex;gap:6px">';
     html += '<button class="btn btn-secondary btn-sm" onclick="copyVisitContent(\'' + sid + '\')" title="記録内容をコピー">📋 記録</button>';
-    html += '<button class="btn btn-secondary btn-sm" onclick="copyVisitObs(\'' + sid + '\')" title="申し送りをコピー">📌 申し送り</button>';
     html += '<button class="btn btn-secondary btn-sm" onclick="editVisit(\'' + sid + '\',\'' + sdate + '\',this)">✏️ 編集</button>';
     html += '<button class="btn btn-sm" onclick="deleteVisit(\'' + sid + '\',\'' + sdate + '\')" style="background:#fdf0f0;color:#d94f4f;border:1px solid #f0b0b0;font-size:12px">🗑️ 削除</button>';
 
