@@ -596,11 +596,12 @@
     /* 極小画面：名前バッジを非表示にしてボタンだけ残す */
     #current-staff-badge { display: none !important; }
   }
-/* ヘッダー右ロゴ：PC では最大200px、スマホは height:36px を維持 */
+/* ヘッダー右ロゴ：PC では左ロゴ(110px)に合わせて拡大、右に自然伸張 */
 @media (min-width: 768px) {
   .header-logo-text {
-    height: auto !important;
-    max-width: 200px;
+    height: 110px !important;
+    width: auto !important;
+    max-width: none;
   }
 }
 
