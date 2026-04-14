@@ -82,9 +82,22 @@
     background: var(--surface);
     border-bottom: 2px solid var(--border);
     position: sticky;
-    top: 76px; /* header: padding 10px×2 + logo 56px = 76px */
+    top: 64px; /* header: padding 10px×2 + logo 44px = 64px */
     z-index: 90;
     box-shadow: var(--shadow);
+  }
+
+  /* ヘッダー右側：モバイルでのはみ出し防止 */
+  .header-right {
+    min-width: 0;
+    flex-shrink: 1;
+  }
+  #current-staff-badge {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 120px;
   }
   .tab-nav-inner {
     max-width: 1400px;
@@ -567,6 +580,11 @@
     .header-logo { height: 42px !important; width: 42px !important; }
     /* header: padding 8px×2 + logo 42px = 58px */
     .tab-nav { top: 58px; }
+    /* 右側ボタンをコンパクトに */
+    .header-right { gap: 4px !important; }
+    #current-staff-badge { max-width: 70px !important; font-size: 10px !important; padding: 2px 6px !important; }
+    #admin-menu-btn { font-size: 10px !important; padding: 2px 6px !important; }
+    .header-right button[onclick="doLogout()"] { font-size: 10px !important; padding: 2px 6px !important; }
   }
 
   @media (max-width: 400px) {
@@ -575,6 +593,8 @@
     .header-logo { height: 36px !important; width: 36px !important; }
     /* header: padding 7px×2 + logo 36px = 50px */
     .tab-nav { top: 50px; }
+    /* 極小画面：名前バッジを非表示にしてボタンだけ残す */
+    #current-staff-badge { display: none !important; }
   }
 /* ヘッダー右ロゴ：PC では最大200px、スマホは height:36px を維持 */
 @media (min-width: 768px) {
