@@ -35,7 +35,7 @@
   .header {
     background: linear-gradient(135deg, #060A12 0%, #0D1B2A 60%, #0F2340 100%);
     color: white;
-    padding: 10px 20px;
+    padding: 8px 20px;
     position: sticky;
     top: 0;
     z-index: 100;
@@ -82,7 +82,7 @@
     background: var(--surface);
     border-bottom: 2px solid var(--border);
     position: sticky;
-    top: 130px; /* header: padding 10px×2 + logo 110px = 130px */
+    top: 76px; /* header: padding 8px×2 + logo 60px = 76px */
     z-index: 90;
     box-shadow: var(--shadow);
   }
@@ -596,10 +596,10 @@
     /* 極小画面：名前バッジを非表示にしてボタンだけ残す */
     #current-staff-badge { display: none !important; }
   }
-/* ヘッダー右ロゴ：PC では左ロゴ(110px)に合わせて拡大、右に自然伸張 */
+/* ヘッダー右ロゴ：PC では左ロゴ(60px)に合わせてスリムに */
 @media (min-width: 768px) {
   .header-logo-text {
-    height: 110px !important;
+    height: 50px !important;
     width: auto !important;
     max-width: none;
   }
