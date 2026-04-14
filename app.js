@@ -1336,6 +1336,10 @@ async function saveVisit() {
     document.getElementById('visit-observations').value = '';
     showStatus('✅ 記録を保存しました');
     loadVisits();
+    // 当日記録→スケジュールに反映
+    var savedDate = date;
+    var todayStr = new Date().toISOString().split('T')[0];
+    if (savedDate === todayStr) loadTodaySchedule();
   } catch(e) {
     showStatus('⚠️ 保存に失敗しました: ' + e.message, 5000);
   } finally {
@@ -3176,17 +3180,30 @@ async function loadTodaySchedule() {
   var list = document.getElementById('today-schedule-list');
   if (!list) return;
   try {
-    var schedules = await supabaseFetch('schedules?visit_date=eq.' + today + '&order=visit_time.asc');
+    var [schedules, todayVisits] = await Promise.all([
+      supabaseFetch('schedules?visit_date=eq.' + today + '&order=visit_time.asc'),
+      supabaseFetch('visits?visit_date=eq.' + today)
+    ]);
+    // 当日記録済みの patient_id を Set で管理
+    var visitedIds = new Set(todayVisits.map(function(v) { return String(v.patient_id); }));
     if (!schedules.length) {
       list.innerHTML = '<div style="font-size:13px;color:var(--text-light);text-align:center;padding:12px 0">今日のスケジュールはありません</div>';
     } else {
       list.innerHTML = schedules.map(function(s) {
-        return '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">' +
+        var visited = visitedIds.has(String(s.patient_id));
+        var rowStyle = visited
+          ? 'display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);background:#f0faf5;border-radius:6px;padding-left:4px'
+          : 'display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)';
+        var badge = visited
+          ? '<span style="font-size:10px;font-weight:700;color:#fff;background:#2e9e6e;border-radius:10px;padding:2px 7px;white-space:nowrap">記録済</span>'
+          : '<span style="font-size:10px;font-weight:700;color:var(--text-light);background:var(--surface2);border-radius:10px;padding:2px 7px;white-space:nowrap">未記録</span>';
+        return '<div style="' + rowStyle + '">' +
           '<div style="font-size:13px;font-weight:700;color:var(--primary);min-width:45px">' + (s.visit_time ? s.visit_time.slice(0,5) : '−') + '</div>' +
           '<div style="flex:1;cursor:pointer" data-pid="' + s.patient_id + '" onclick="selectPatientByIdEl(this)">' +
           '<div style="font-size:13px;font-weight:700">' + (s.notes || '−') + '</div>' +
           '<div style="font-size:11px;color:var(--text-secondary)">' + (s.staff_name || '') + '</div>' +
           '</div>' +
+          badge +
           '<button data-id="' + s.id + '" onclick="deleteScheduleBtn(this)" style="background:none;border:none;color:#ccc;cursor:pointer;font-size:14px">×</button>' +
           '</div>';
       }).join('');

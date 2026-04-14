@@ -82,7 +82,7 @@
     background: var(--surface);
     border-bottom: 2px solid var(--border);
     position: sticky;
-    top: 70px;
+    top: 76px; /* header: padding 10px×2 + logo 56px = 76px */
     z-index: 90;
     box-shadow: var(--shadow);
   }
@@ -565,12 +565,16 @@
     /* ヘッダー：サブタイトル非表示、ロゴ縮小、右側コンパクト化 */
     .header-subtitle { display: none; }
     .header-logo { height: 42px !important; width: 42px !important; }
+    /* header: padding 8px×2 + logo 42px = 58px */
+    .tab-nav { top: 58px; }
   }
 
   @media (max-width: 400px) {
     .header { padding: 7px 10px; }
     .header-inner { gap: 6px; }
     .header-logo { height: 36px !important; width: 36px !important; }
+    /* header: padding 7px×2 + logo 36px = 50px */
+    .tab-nav { top: 50px; }
   }
 /* ヘッダー右ロゴ：PC では最大200px、スマホは height:36px を維持 */
 @media (min-width: 768px) {
