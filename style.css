@@ -56,12 +56,6 @@
     display: flex; align-items: center; justify-content: center;
     font-size: 20px;
   }
-  .header-logo {
-    background: rgba(255,255,255,0.10);
-    border-radius: 12px;
-    padding: 4px;
-    filter: brightness(1.15) drop-shadow(0 0 8px rgba(77,195,247,0.55));
-  }
   .header h1 {
     font-size: 18px;
     font-weight: 700;
@@ -583,9 +577,9 @@
     }
     /* ヘッダー：サブタイトル非表示、ロゴ縮小、右側コンパクト化 */
     .header-subtitle { display: none; }
-    .header-logo { height: 42px !important; width: 42px !important; }
-    /* header: padding 8px×2 + logo 42px = 58px */
-    .tab-nav { top: 58px; }
+    .header-logo { height: 56px !important; width: auto !important; }
+    /* header: padding 8px×2 + logo 56px = 72px */
+    .tab-nav { top: 72px; }
     /* 右側ボタンをコンパクトに */
     .header-right { gap: 4px !important; }
     #current-staff-badge { max-width: 70px !important; font-size: 10px !important; padding: 2px 6px !important; }
@@ -596,9 +590,9 @@
   @media (max-width: 400px) {
     .header { padding: 7px 10px; }
     .header-inner { gap: 6px; }
-    .header-logo { height: 36px !important; width: 36px !important; }
-    /* header: padding 7px×2 + logo 36px = 50px */
-    .tab-nav { top: 50px; }
+    .header-logo { height: 48px !important; width: auto !important; }
+    /* header: padding 7px×2 + logo 48px = 62px */
+    .tab-nav { top: 62px; }
     /* 極小画面：名前バッジを非表示にしてボタンだけ残す */
     #current-staff-badge { display: none !important; }
   }
