@@ -1198,6 +1198,7 @@ function renderVisits() {
     html += '<button class="btn btn-secondary btn-sm" onclick="copyVisitContent(\'' + sid + '\')" title="記録内容をコピー">📋 記録</button>';
     html += '<button class="btn btn-secondary btn-sm" onclick="copyVisitObs(\'' + sid + '\')" title="申し送りをコピー">📌 申し送り</button>';
     html += '<button class="btn btn-secondary btn-sm" onclick="editVisit(\'' + sid + '\',\'' + sdate + '\',this)">✏️ 編集</button>';
+    html += '<button class="btn btn-sm" onclick="deleteVisit(\'' + sid + '\',\'' + sdate + '\')" style="background:#fdf0f0;color:#d94f4f;border:1px solid #f0b0b0;font-size:12px">🗑️ 削除</button>';
 
     html += '</div></div>';
     if (v.staff_name) html += '<div style="font-size:11px;color:var(--primary);font-weight:700;margin-bottom:6px">👤 ' + v.staff_name + '</div>';
@@ -1449,12 +1450,14 @@ function copyVisitObs(id) {
   copyToClipboard(obsEl.textContent.replace('📌', '').trim(), '申し送り');
 }
 
-async function deleteVisit(id) {
-  if (!confirm('この記録を削除しますか？')) return;
+async function deleteVisit(id, visitDate) {
+  if (!confirm('この訪問記録を削除しますか？\n※この操作は取り消せません')) return;
   try {
-    await supabaseFetch(`visits?id=eq.${id}`, 'DELETE');
-    showStatus('🗑️ 削除しました');
+    await supabaseFetch('visits?id=eq.' + id, 'DELETE');
+    showStatus('🗑️ 記録を削除しました');
     loadVisits();
+    // 削除した記録の日付がスケジュール表示日と一致すれば反映
+    if (visitDate && visitDate === (window.scheduleViewDate || localDateStr())) loadTodaySchedule();
   } catch(e) {
     showStatus('⚠️ 削除に失敗しました: ' + e.message, 5000);
   }
