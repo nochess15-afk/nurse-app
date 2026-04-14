@@ -572,6 +572,14 @@
     .header-inner { gap: 6px; }
     .header-logo { height: 36px !important; width: 36px !important; }
   }
+/* ヘッダー右ロゴ：PC では最大200px、スマホは height:36px を維持 */
+@media (min-width: 768px) {
+  .header-logo-text {
+    height: auto !important;
+    max-width: 200px;
+  }
+}
+
 .vital-input::-webkit-outer-spin-button,
 .vital-input::-webkit-inner-spin-button {
   -webkit-appearance: none;
