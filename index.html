@@ -235,11 +235,16 @@
     <!-- 右カラム -->
     <div style="display:flex;flex-direction:column;gap:16px;position:sticky;top:140px">
 
-      <!-- 今日のスケジュール -->
+      <!-- スケジュール -->
       <div class="card">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-          <div class="card-title" style="margin-bottom:0">📅 今日のスケジュール</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div class="card-title" style="margin-bottom:0">📅 スケジュール</div>
           <button class="btn btn-secondary btn-sm" onclick="toggleScheduleAdd()" style="font-size:11px">＋ 追加</button>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;background:var(--surface2);border-radius:8px;padding:4px 6px">
+          <button onclick="scheduleNavDate(-1)" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--primary);padding:2px 8px;line-height:1">‹</button>
+          <div id="schedule-date-label" style="font-size:12px;font-weight:700;color:var(--text);text-align:center"></div>
+          <button onclick="scheduleNavDate(1)" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--primary);padding:2px 8px;line-height:1">›</button>
         </div>
         <div id="today-schedule-list">
           <div style="font-size:13px;color:var(--text-light);text-align:center;padding:12px 0">読み込み中...</div>

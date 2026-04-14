@@ -39,7 +39,7 @@ function switchTab(tab) {
     if (b.getAttribute('onclick') === "switchTab('" + tab + "')") b.classList.add('active');
   });
   // 患者一覧に戻ったら個人タブを隠して一括タブを表示
-  if (tab === 'patients') { loadTodaySchedule();
+  if (tab === 'patients') { window.scheduleViewDate = new Date().toISOString().split('T')[0]; loadTodaySchedule();
     ['tab-record','tab-keikaku','tab-hokoku'].forEach(function(id) {
       var el = document.getElementById(id); if(el) el.style.display = 'none';
     });
@@ -1336,10 +1336,8 @@ async function saveVisit() {
     document.getElementById('visit-observations').value = '';
     showStatus('✅ 記録を保存しました');
     loadVisits();
-    // 当日記録→スケジュールに反映
-    var savedDate = date;
-    var todayStr = new Date().toISOString().split('T')[0];
-    if (savedDate === todayStr) loadTodaySchedule();
+    // 保存日がスケジュール表示日と一致すれば反映
+    if (date === (window.scheduleViewDate || new Date().toISOString().split('T')[0])) loadTodaySchedule();
   } catch(e) {
     showStatus('⚠️ 保存に失敗しました: ' + e.message, 5000);
   } finally {
@@ -3175,19 +3173,45 @@ async function deletePatient(btn) {
 }
 
 // ===== スケジュール管理 =====
-async function loadTodaySchedule() {
+// 表示中の日付（デフォルト：今日）
+window.scheduleViewDate = new Date().toISOString().split('T')[0];
+
+function formatScheduleDateLabel(dateStr) {
   var today = new Date().toISOString().split('T')[0];
+  var d = new Date(dateStr + 'T00:00:00');
+  var mm = d.getMonth() + 1;
+  var dd = d.getDate();
+  var weeks = ['日','月','火','水','木','金','土'];
+  var dow = weeks[d.getDay()];
+  var diff = Math.round((new Date(dateStr) - new Date(today)) / 86400000);
+  var label = diff === -1 ? '昨日' : diff === 0 ? '今日' : diff === 1 ? '明日' : '';
+  return (label ? label + ' ' : '') + mm + '/' + dd + '（' + dow + '）';
+}
+
+function scheduleNavDate(offset) {
+  var d = new Date(window.scheduleViewDate + 'T00:00:00');
+  d.setDate(d.getDate() + offset);
+  window.scheduleViewDate = d.toISOString().split('T')[0];
+  loadTodaySchedule();
+}
+
+async function loadTodaySchedule() {
+  var today = window.scheduleViewDate || new Date().toISOString().split('T')[0];
   var list = document.getElementById('today-schedule-list');
   if (!list) return;
+  // 日付ラベル更新
+  var label = document.getElementById('schedule-date-label');
+  if (label) label.textContent = formatScheduleDateLabel(today);
   try {
     var [schedules, todayVisits] = await Promise.all([
       supabaseFetch('schedules?visit_date=eq.' + today + '&order=visit_time.asc'),
       supabaseFetch('visits?visit_date=eq.' + today)
     ]);
-    // 当日記録済みの patient_id を Set で管理
+    // 表示日の記録済み patient_id を Set で管理
     var visitedIds = new Set(todayVisits.map(function(v) { return String(v.patient_id); }));
+    var isToday = today === new Date().toISOString().split('T')[0];
     if (!schedules.length) {
-      list.innerHTML = '<div style="font-size:13px;color:var(--text-light);text-align:center;padding:12px 0">今日のスケジュールはありません</div>';
+      list.innerHTML = '<div style="font-size:13px;color:var(--text-light);text-align:center;padding:12px 0">スケジュールはありません</div>';
     } else {
       list.innerHTML = schedules.map(function(s) {
         var visited = visitedIds.has(String(s.patient_id));
@@ -3259,10 +3283,10 @@ async function saveSchedule() {
   var time = document.getElementById('sch-time').value;
   var notes = document.getElementById('sch-notes').value.trim();
   if (!patientId) { showStatus('⚠️ 患者を選択してください'); return; }
-  var today = new Date().toISOString().split('T')[0];
+  var targetDate = window.scheduleViewDate || new Date().toISOString().split('T')[0];
   try {
     await supabaseFetch('schedules', 'POST', {
-      visit_date: today,
+      visit_date: targetDate,
       patient_id: patientId,
       staff_name: staff || null,
       visit_time: time || null,
