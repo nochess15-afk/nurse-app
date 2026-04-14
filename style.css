@@ -578,6 +578,7 @@
     /* ヘッダー：サブタイトル非表示、ロゴ縮小、右側コンパクト化 */
     .header-subtitle { display: none; }
     .header-logo { height: 56px !important; width: auto !important; }
+    .header-logo-text { height: 44px !important; width: auto !important; }
     /* header: padding 8px×2 + logo 56px = 72px */
     .tab-nav { top: 72px; }
     /* 右側ボタンをコンパクトに */
@@ -591,6 +592,7 @@
     .header { padding: 7px 10px; }
     .header-inner { gap: 6px; }
     .header-logo { height: 48px !important; width: auto !important; }
+    .header-logo-text { height: 36px !important; width: auto !important; }
     /* header: padding 7px×2 + logo 48px = 62px */
     .tab-nav { top: 62px; }
     /* 極小画面：名前バッジを非表示にしてボタンだけ残す */
