@@ -583,6 +583,13 @@ async function loadPatients() {
   }
 }
 
+// 担当者フィールド（複数名を「、,・/ 」区切りで入力可）に自分が含まれるか判定
+function isMyPatient(nurseField, myName) {
+  if (!nurseField || !myName) return false;
+  var nurses = nurseField.split(/[、,・\/\s]+/).map(function(s) { return s.trim(); }).filter(Boolean);
+  return nurses.some(function(n) { return n === myName; });
+}
+
 function togglePatientFilter() {
   showAllPatients = !showAllPatients;
   var btn = document.getElementById('btn-my-patients');
@@ -599,7 +606,7 @@ function togglePatientFilter() {
     btn.style.background = '';
     var myName = currentStaffInfo ? currentStaffInfo.name : '';
     var filtered = (window.allPatientsForList || []).filter(function(p) {
-      return !myName || (p.nurse && p.nurse.includes(myName));
+      return !myName || isMyPatient(p.nurse, myName);
     });
     renderPatientList(filtered);
   }
@@ -609,7 +616,7 @@ function filterPatientList(query) {
   var base = window.allPatientsForList || [];
   if (!showAllPatients && currentStaffInfo) {
     var myName = currentStaffInfo.name;
-    base = base.filter(function(p) { return p.nurse && p.nurse.includes(myName); });
+    base = base.filter(function(p) { return isMyPatient(p.nurse, myName); });
   }
   if (!query.trim()) { renderPatientList(base); return; }
   var filtered = base.filter(function(p) { return matchPatient(p, query); })
