@@ -599,7 +599,7 @@ function togglePatientFilter() {
     btn.style.background = '';
     var myName = currentStaffInfo ? currentStaffInfo.name : '';
     var filtered = (window.allPatientsForList || []).filter(function(p) {
-      return !myName || !p.nurse || p.nurse.includes(myName);
+      return !myName || (p.nurse && p.nurse.includes(myName));
     });
     renderPatientList(filtered);
   }
@@ -609,7 +609,7 @@ function filterPatientList(query) {
   var base = window.allPatientsForList || [];
   if (!showAllPatients && currentStaffInfo) {
     var myName = currentStaffInfo.name;
-    base = base.filter(function(p) { return !p.nurse || p.nurse.includes(myName); });
+    base = base.filter(function(p) { return p.nurse && p.nurse.includes(myName); });
   }
   if (!query.trim()) { renderPatientList(base); return; }
   var filtered = base.filter(function(p) { return matchPatient(p, query); })
