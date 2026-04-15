@@ -2137,14 +2137,13 @@ async function analyzeDocument() {
       contentBlock = { type: 'image', source: { type: 'base64', media_type: imgMediaType, data: docFileData } };
     }
 
-    // ヘッダーはNetlify Functions側で設定（PDFベータはusePdfBetaフラグで渡す）
-
-    var response = await fetch('https://api.anthropic.com/v1/messages', {
+    var response = await fetch('/.netlify/functions/claude', {
       method: 'POST',
-      headers: headers,
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: CLAUDE_MODEL,
         max_tokens: 600,
+        usePdfBeta: docFileType === 'pdf',
         messages: [{
           role: 'user',
           content: [
