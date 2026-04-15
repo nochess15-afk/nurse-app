@@ -87,6 +87,12 @@
     box-shadow: var(--shadow);
   }
 
+  /* ロゴ画像の背景をヘッダー背景に溶け込ませる */
+  .header-logo,
+  .header-logo-text {
+    mix-blend-mode: screen;
+  }
+
   /* ヘッダー右側：モバイルでのはみ出し防止 */
   .header-right {
     min-width: 0;
