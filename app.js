@@ -577,7 +577,7 @@ async function loadPatients() {
     // 全患者をキャッシュ
     window.allPatientsCache = patients;
     window.allPatientsForList = patients;
-    renderPatientList(patients);
+    filterPatientList('');
   } catch(e) {
     container.innerHTML = `<div class="alert alert-error">⚠️ 患者情報の読み込みに失敗しました: ${e.message}</div>`;
   }
