@@ -399,11 +399,17 @@
           <label>ADL（日常生活動作）</label>
           <input type="hidden" id="reg-adl">
           <button type="button" id="adl-toggle-btn" onclick="toggleAdlPanel()" style="font-family:'Noto Sans JP',sans-serif;font-size:13px;font-weight:700;padding:8px 16px;border-radius:20px;border:1.5px solid var(--border);background:var(--surface);color:var(--text-primary);cursor:pointer;width:100%;text-align:left;transition:all 0.18s">ADL入力 ▼</button>
-          <div id="adl-panel" style="display:none;margin-top:8px;border:1.5px solid var(--border);border-radius:12px;padding:12px;background:var(--surface)">
-            <div style="font-size:11px;font-weight:700;color:var(--primary);margin-bottom:8px;letter-spacing:0.5px">▍基本ADL</div>
-            <div id="adl-basic-items"></div>
-            <div style="font-size:11px;font-weight:700;color:var(--primary);margin:12px 0 8px;letter-spacing:0.5px">▍手段的ADL</div>
-            <div id="adl-iadl-items"></div>
+          <div id="adl-panel" style="display:none;margin-top:8px;border:1.5px solid var(--border);border-radius:12px;padding:14px;background:var(--surface)">
+            <div style="font-size:11px;font-weight:700;color:var(--primary);margin-bottom:10px;letter-spacing:0.5px">▍基本ADL</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 16px" class="adl-grid">
+              <div id="adl-basic-left"></div>
+              <div id="adl-basic-right"></div>
+            </div>
+            <div style="font-size:11px;font-weight:700;color:var(--primary);margin:14px 0 10px;letter-spacing:0.5px">▍手段的ADL</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 16px" class="adl-grid">
+              <div id="adl-iadl-left"></div>
+              <div id="adl-iadl-right"></div>
+            </div>
           </div>
         </div>
         <div class="form-group full">

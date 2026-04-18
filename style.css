@@ -613,6 +613,12 @@
   }
 }
 
+@media (max-width: 767px) {
+  .adl-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
 .vital-input::-webkit-outer-spin-button,
 .vital-input::-webkit-inner-spin-button {
   -webkit-appearance: none;

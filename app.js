@@ -907,30 +907,56 @@ async function getDiseaseItemsAI(diagnosis) {
   }
 }
 
-// ===== ADL ラジオボタン =====
-var ADL_BASIC = ['食事', '更衣', '整容', '口腔ケア', '入浴', 'トイレ', '移乗', '移動', '階段'];
-var ADL_IADL  = ['買い物', '調理', '服薬管理', '金銭管理', '電話操作'];
-var ADL_ALL   = ADL_BASIC.concat(ADL_IADL);
+// ===== ADL ボタン選択UI =====
+var ADL_BASIC_L = ['食事', '更衣', '整容', '口腔ケア', '入浴'];
+var ADL_BASIC_R = ['トイレ', '移乗', '移動', '階段'];
+var ADL_IADL_L  = ['買い物', '調理'];
+var ADL_IADL_R  = ['服薬管理', '金銭管理', '電話操作'];
+var ADL_ALL     = ADL_BASIC_L.concat(ADL_BASIC_R, ADL_IADL_L, ADL_IADL_R);
+
+// ボタンの幅定義
+var ADL_BTN_WIDTH = {'自立': '4em', '一部介助': '6em', '全介助': '5em'};
+// テーマカラー（紺系）
+var ADL_SEL_BG   = '#1e3a5f';
+var ADL_SEL_TEXT = '#ffffff';
 
 function buildAdlPanel() {
   function makeRows(items, containerId) {
     var container = document.getElementById(containerId);
     if (!container) return;
     container.innerHTML = items.map(function(item) {
-      var safeName = 'adl-' + item;
-      return '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap">' +
-        '<span style="min-width:72px;font-size:13px;font-weight:600;color:var(--text-primary)">' + item + '</span>' +
+      var id = 'adlrow-' + item;
+      return '<div id="' + id + '" style="display:flex;align-items:center;gap:5px;margin-bottom:7px">' +
+        '<span style="min-width:5em;font-size:13px;font-weight:600;color:var(--text-primary);flex-shrink:0">' + item + '</span>' +
         ['自立', '一部介助', '全介助'].map(function(val) {
-          var color = val === '自立' ? '#22c55e' : val === '一部介助' ? '#f59e0b' : '#ef4444';
-          return '<label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;padding:3px 8px;border-radius:20px;border:1px solid #e2e8f0;background:#fff;transition:all 0.15s" class="adl-option">' +
-            '<input type="radio" name="' + safeName + '" value="' + val + '" onchange="updateAdlJson()" style="accent-color:' + color + '">' +
-            val + '</label>';
+          return '<button type="button"' +
+            ' data-item="' + item + '" data-val="' + val + '"' +
+            ' onclick="selectAdl(this)"' +
+            ' style="width:' + ADL_BTN_WIDTH[val] + ';white-space:nowrap;font-family:\'Noto Sans JP\',sans-serif;font-size:12px;font-weight:600;padding:4px 0;border-radius:6px;border:1.5px solid #cbd5e1;background:#fff;color:#64748b;cursor:pointer;transition:all 0.15s;flex-shrink:0">' +
+            val + '</button>';
         }).join('') +
         '</div>';
     }).join('');
   }
-  makeRows(ADL_BASIC, 'adl-basic-items');
-  makeRows(ADL_IADL,  'adl-iadl-items');
+  makeRows(ADL_BASIC_L, 'adl-basic-left');
+  makeRows(ADL_BASIC_R, 'adl-basic-right');
+  makeRows(ADL_IADL_L,  'adl-iadl-left');
+  makeRows(ADL_IADL_R,  'adl-iadl-right');
+}
+
+function selectAdl(btn) {
+  var item = btn.getAttribute('data-item');
+  // 同じ項目の全ボタンをリセット
+  document.querySelectorAll('button[data-item="' + item + '"]').forEach(function(b) {
+    b.style.background = '#fff';
+    b.style.color = '#64748b';
+    b.style.borderColor = '#cbd5e1';
+  });
+  // 選択ボタンをアクティブ化
+  btn.style.background = ADL_SEL_BG;
+  btn.style.color = ADL_SEL_TEXT;
+  btn.style.borderColor = ADL_SEL_BG;
+  updateAdlJson();
 }
 
 function toggleAdlPanel() {
@@ -938,7 +964,7 @@ function toggleAdlPanel() {
   var btn   = document.getElementById('adl-toggle-btn');
   if (!panel) return;
   if (panel.style.display === 'none') {
-    if (!document.getElementById('adl-basic-items').children.length) buildAdlPanel();
+    if (!document.getElementById('adl-basic-left').children.length) buildAdlPanel();
     panel.style.display = '';
     btn.textContent = 'ADL入力 ▲';
   } else {
@@ -950,18 +976,20 @@ function toggleAdlPanel() {
 function updateAdlJson() {
   var obj = {};
   ADL_ALL.forEach(function(item) {
-    var sel = document.querySelector('input[name="adl-' + item + '"]:checked');
-    if (sel) obj[item] = sel.value;
+    var sel = document.querySelector('button[data-item="' + item + '"][style*="' + ADL_SEL_BG + '"]');
+    if (sel) obj[item] = sel.getAttribute('data-val');
   });
   var el = document.getElementById('reg-adl');
   if (el) el.value = Object.keys(obj).length ? JSON.stringify(obj) : '';
 }
 
 function setAdlFromJson(str) {
-  // Ensure panel is built (even if collapsed)
-  if (!document.getElementById('adl-basic-items').children.length) buildAdlPanel();
-  ADL_ALL.forEach(function(item) {
-    document.querySelectorAll('input[name="adl-' + item + '"]').forEach(function(inp) { inp.checked = false; });
+  if (!document.getElementById('adl-basic-left').children.length) buildAdlPanel();
+  // 全ボタンをリセット
+  document.querySelectorAll('button[data-item]').forEach(function(b) {
+    b.style.background = '#fff';
+    b.style.color = '#64748b';
+    b.style.borderColor = '#cbd5e1';
   });
   var el = document.getElementById('reg-adl');
   if (el) el.value = str || '';
@@ -970,8 +998,12 @@ function setAdlFromJson(str) {
   try { obj = JSON.parse(str); } catch(e) { return; }
   ADL_ALL.forEach(function(item) {
     if (obj[item]) {
-      var inp = document.querySelector('input[name="adl-' + item + '"][value="' + obj[item] + '"]');
-      if (inp) inp.checked = true;
+      var btn = document.querySelector('button[data-item="' + item + '"][data-val="' + obj[item] + '"]');
+      if (btn) {
+        btn.style.background = ADL_SEL_BG;
+        btn.style.color = ADL_SEL_TEXT;
+        btn.style.borderColor = ADL_SEL_BG;
+      }
     }
   });
 }
@@ -1234,10 +1266,14 @@ function clearRegForm() {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
-  // ADLラジオボタンをリセット
-  ADL_ALL.forEach(function(item) {
-    document.querySelectorAll('input[name="adl-' + item + '"]').forEach(function(inp) { inp.checked = false; });
+  // ADLボタンをリセット
+  document.querySelectorAll('button[data-item]').forEach(function(b) {
+    b.style.background = '#fff';
+    b.style.color = '#64748b';
+    b.style.borderColor = '#cbd5e1';
   });
+  var adlEl = document.getElementById('reg-adl');
+  if (adlEl) adlEl.value = '';
   document.getElementById('obs-card').style.display = 'none';
 }
 
