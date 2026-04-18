@@ -907,6 +907,82 @@ async function getDiseaseItemsAI(diagnosis) {
   }
 }
 
+// ===== ADL ラジオボタン =====
+var ADL_BASIC = ['食事', '更衣', '整容', '口腔ケア', '入浴', 'トイレ', '移乗', '移動', '階段'];
+var ADL_IADL  = ['買い物', '調理', '服薬管理', '金銭管理', '電話操作'];
+var ADL_ALL   = ADL_BASIC.concat(ADL_IADL);
+
+function buildAdlPanel() {
+  function makeRows(items, containerId) {
+    var container = document.getElementById(containerId);
+    if (!container) return;
+    container.innerHTML = items.map(function(item) {
+      var safeName = 'adl-' + item;
+      return '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap">' +
+        '<span style="min-width:72px;font-size:13px;font-weight:600;color:var(--text-primary)">' + item + '</span>' +
+        ['自立', '一部介助', '全介助'].map(function(val) {
+          var color = val === '自立' ? '#22c55e' : val === '一部介助' ? '#f59e0b' : '#ef4444';
+          return '<label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;padding:3px 8px;border-radius:20px;border:1px solid #e2e8f0;background:#fff;transition:all 0.15s" class="adl-option">' +
+            '<input type="radio" name="' + safeName + '" value="' + val + '" onchange="updateAdlJson()" style="accent-color:' + color + '">' +
+            val + '</label>';
+        }).join('') +
+        '</div>';
+    }).join('');
+  }
+  makeRows(ADL_BASIC, 'adl-basic-items');
+  makeRows(ADL_IADL,  'adl-iadl-items');
+}
+
+function toggleAdlPanel() {
+  var panel = document.getElementById('adl-panel');
+  var btn   = document.getElementById('adl-toggle-btn');
+  if (!panel) return;
+  if (panel.style.display === 'none') {
+    if (!document.getElementById('adl-basic-items').children.length) buildAdlPanel();
+    panel.style.display = '';
+    btn.textContent = 'ADL入力 ▲';
+  } else {
+    panel.style.display = 'none';
+    btn.textContent = 'ADL入力 ▼';
+  }
+}
+
+function updateAdlJson() {
+  var obj = {};
+  ADL_ALL.forEach(function(item) {
+    var sel = document.querySelector('input[name="adl-' + item + '"]:checked');
+    if (sel) obj[item] = sel.value;
+  });
+  var el = document.getElementById('reg-adl');
+  if (el) el.value = Object.keys(obj).length ? JSON.stringify(obj) : '';
+}
+
+function setAdlFromJson(str) {
+  // Ensure panel is built (even if collapsed)
+  if (!document.getElementById('adl-basic-items').children.length) buildAdlPanel();
+  ADL_ALL.forEach(function(item) {
+    document.querySelectorAll('input[name="adl-' + item + '"]').forEach(function(inp) { inp.checked = false; });
+  });
+  var el = document.getElementById('reg-adl');
+  if (el) el.value = str || '';
+  if (!str) return;
+  var obj;
+  try { obj = JSON.parse(str); } catch(e) { return; }
+  ADL_ALL.forEach(function(item) {
+    if (obj[item]) {
+      var inp = document.querySelector('input[name="adl-' + item + '"][value="' + obj[item] + '"]');
+      if (inp) inp.checked = true;
+    }
+  });
+}
+
+function adlJsonToText(str) {
+  if (!str) return '';
+  var obj;
+  try { obj = JSON.parse(str); } catch(e) { return str; }
+  return Object.keys(obj).map(function(k) { return k + '：' + obj[k]; }).join('、');
+}
+
 // ===== 患者登録 =====
 async function generateObservations() {
   const name = document.getElementById('reg-name').value.trim();
@@ -915,7 +991,7 @@ async function generateObservations() {
   const diagnosis = document.getElementById('reg-diagnosis').value.trim();
   const history = document.getElementById('reg-history').value.trim();
   const procedures = document.getElementById('reg-procedures').value.trim();
-  const adl = document.getElementById('reg-adl').value.trim();
+  const adl = adlJsonToText(document.getElementById('reg-adl').value.trim());
   const notes = document.getElementById('reg-notes').value.trim();
 
   if (!name) { showStatus('⚠️ 氏名を入力してください'); return; }
@@ -1157,6 +1233,10 @@ function clearRegForm() {
   ['reg-name','reg-age','reg-gender','reg-nurse','reg-diagnosis','reg-history','reg-procedures','reg-adl','reg-notes','reg-medicines','reg-care-level','reg-independence','reg-dementia-level','reg-living-situation','reg-key-person','reg-emergency-contact','reg-caregiver-notes'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
+  });
+  // ADLラジオボタンをリセット
+  ADL_ALL.forEach(function(item) {
+    document.querySelectorAll('input[name="adl-' + item + '"]').forEach(function(inp) { inp.checked = false; });
   });
   document.getElementById('obs-card').style.display = 'none';
 }
@@ -1502,7 +1582,7 @@ async function generateAssessment() {
     // 今日入力中の記録も取得
     var todayRecord = document.getElementById('visit-content').value.trim();
 
-    var patientInfo = '【患者情報】\n氏名：' + currentPatient.name + '（' + (currentPatient.age||'不明') + '歳・' + (currentPatient.gender||'不明') + '）\n主病名：' + (currentPatient.main_diagnosis||'') + '\n既往歴：' + (currentPatient.medical_history||'') + '\n医療処置：' + (currentPatient.medical_procedures||'') + '\nADL：' + (currentPatient.adl||'') + '\n内服薬：' + (currentPatient.medicines||'なし') + '\n特記事項：' + (currentPatient.notes||'') + '\n生活状況：' + (currentPatient.living_situation||'') + '\nキーパーソン：' + (currentPatient.key_person||'') + '\n緊急連絡先：' + (currentPatient.emergency_contact||'') + '\n介護者・家族の状況：' + (currentPatient.caregiver_notes||'');
+    var patientInfo = '【患者情報】\n氏名：' + currentPatient.name + '（' + (currentPatient.age||'不明') + '歳・' + (currentPatient.gender||'不明') + '）\n主病名：' + (currentPatient.main_diagnosis||'') + '\n既往歴：' + (currentPatient.medical_history||'') + '\n医療処置：' + (currentPatient.medical_procedures||'') + '\nADL：' + adlJsonToText(currentPatient.adl||'') + '\n内服薬：' + (currentPatient.medicines||'なし') + '\n特記事項：' + (currentPatient.notes||'') + '\n生活状況：' + (currentPatient.living_situation||'') + '\nキーパーソン：' + (currentPatient.key_person||'') + '\n緊急連絡先：' + (currentPatient.emergency_contact||'') + '\n介護者・家族の状況：' + (currentPatient.caregiver_notes||'');
 
     var userContent = patientInfo +
       (todayRecord ? '\n\n【本日の記録（入力中）】\n' + todayRecord : '') +
@@ -3085,7 +3165,7 @@ async function editPatientBtn(btn) {
     document.getElementById('reg-diagnosis').value = p.main_diagnosis || '';
     document.getElementById('reg-history').value = p.medical_history || '';
     document.getElementById('reg-procedures').value = p.medical_procedures || '';
-    document.getElementById('reg-adl').value = p.adl || '';
+    setAdlFromJson(p.adl || '');
     document.getElementById('reg-notes').value = p.notes || '';
     var medEl = document.getElementById('reg-medicines');
     if (medEl) medEl.value = p.medicines || '';
@@ -3137,7 +3217,7 @@ function togglePatientDetail() {
       { label: '主病名', value: p.main_diagnosis },
       { label: '既往歴', value: p.medical_history },
       { label: '医療処置', value: p.medical_procedures },
-      { label: 'ADL', value: p.adl },
+      { label: 'ADL', value: adlJsonToText(p.adl) },
       { label: '特記事項', value: p.notes },
       { label: '生活状況', value: p.living_situation },
       { label: 'キーパーソン', value: p.key_person },
@@ -3179,7 +3259,7 @@ function editCurrentPatient() {
   document.getElementById('reg-diagnosis').value = p.main_diagnosis || '';
   document.getElementById('reg-history').value = p.medical_history || '';
   document.getElementById('reg-procedures').value = p.medical_procedures || '';
-  document.getElementById('reg-adl').value = p.adl || '';
+  setAdlFromJson(p.adl || '');
   document.getElementById('reg-notes').value = p.notes || '';
   var medEl = document.getElementById('reg-medicines');
   if (medEl) medEl.value = p.medicines || '';
@@ -3552,7 +3632,7 @@ async function sendNursingChat() {
       '患者に関する質問は患者情報・記録（看護記録・リハビリ記録両方）を踏まえて答えてください。一般的な知識の質問は丁寧にわかりやすく、新人や学生には根拠も含めて説明してください。回答は簡潔かつ実用的に。' +
       '\n\n【患者情報】\n氏名：' + currentPatient.name + '（' + (currentPatient.age||'不明') + '歳・' + (currentPatient.gender||'不明') + '）\n主病名：' + (currentPatient.main_diagnosis||'') +
       '\n既往歴：' + (currentPatient.medical_history||'') + '\n医療処置：' + (currentPatient.medical_procedures||'') +
-      '\nADL：' + (currentPatient.adl||'') + '\n内服薬：' + (currentPatient.medicines||'なし') +
+      '\nADL：' + adlJsonToText(currentPatient.adl||'') + '\n内服薬：' + (currentPatient.medicines||'なし') +
       '\n\n【直近の訪問記録】\n' + (visitText||'記録なし') +
       (currentRecord ? '\n\n【本日入力中の記録】\n' + currentRecord : '');
 
@@ -4000,7 +4080,7 @@ async function generateRehabPlan() {
       return '【' + v.visit_date + '】' + '\n' + (v.content || '') + (v.observations ? '\n申し送り：' + v.observations : '');
     }).join('\n\n');
 
-    const patientInfo = '【患者情報】\n氏名：' + currentPatient.name + '（' + (currentPatient.age || '不明') + '歳・' + (currentPatient.gender || '不明') + '）\n主病名：' + (currentPatient.main_diagnosis || '') + '\n既往歴：' + (currentPatient.medical_history || '') + '\n医療処置：' + (currentPatient.medical_procedures || '') + '\nADL：' + (currentPatient.adl || '') + '\n特記事項：' + (currentPatient.notes || '') + '\n\n【リハビリ記録（直近）】\n' + (visitText || '記録なし');
+    const patientInfo = '【患者情報】\n氏名：' + currentPatient.name + '（' + (currentPatient.age || '不明') + '歳・' + (currentPatient.gender || '不明') + '）\n主病名：' + (currentPatient.main_diagnosis || '') + '\n既往歴：' + (currentPatient.medical_history || '') + '\n医療処置：' + (currentPatient.medical_procedures || '') + '\nADL：' + adlJsonToText(currentPatient.adl || '') + '\n特記事項：' + (currentPatient.notes || '') + '\n\n【リハビリ記録（直近）】\n' + (visitText || '記録なし');
 
     const result = await callClaude(
       'あなたは訪問リハビリの専門家（PT・OT・ST対応）です。患者情報とリハビリ記録をもとに、訪問リハビリ計画書を作成してください。以下の構成で記載してください：1. 現在の機能評価（身体機能・ADL・認知機能）2. リハビリ上の問題点（3〜5つ）3. 短期目標（1〜3ヶ月）4. 長期目標（6ヶ月〜1年）5. リハビリ計画（PT・OT・STそれぞれ該当する内容を記載）6. 自主トレーニング指導内容 7. 家族・介護者への指導事項 8. 多職種への情報共有事項。専門的かつ実用的な内容で記載してください。\n\n【倫理的制約】\n・本人が望んでいない生活変容・行動変容を推奨しない\n・本人の意思・価値観・生活習慣を否定するような表現を使わない\n・「〜すべき」「〜させる必要がある」という一方的な表現を避ける\n・家族の希望を本人の意向より優先する示唆をしない\n・AIの出力はあくまで看護師の判断を補助するものであり、最終判断は必ず担当看護師が行う',
@@ -4056,7 +4136,7 @@ async function generateKeikaku() {
       if (diseaseObs) commonObs = commonObs.concat(diseaseObs.items);
       obsItems = commonObs.join('\n');
     }
-    var patientInfo = '氏名：' + currentPatient.name + '（' + (currentPatient.age||'不明') + '歳・' + (currentPatient.gender||'不明') + '）\n主病名：' + (currentPatient.main_diagnosis||'') + '\n既往歴：' + (currentPatient.medical_history||'') + '\n医療処置：' + (currentPatient.medical_procedures||'') + '\nADL：' + (currentPatient.adl||'') + '\n特記事項：' + (currentPatient.notes||'') + '\n要介護度：' + (currentPatient.care_level||'') + '\n障害高齢者自立度：' + (currentPatient.independence_level||'') + '\n認知症自立度：' + (currentPatient.dementia_level||'');
+    var patientInfo = '氏名：' + currentPatient.name + '（' + (currentPatient.age||'不明') + '歳・' + (currentPatient.gender||'不明') + '）\n主病名：' + (currentPatient.main_diagnosis||'') + '\n既往歴：' + (currentPatient.medical_history||'') + '\n医療処置：' + (currentPatient.medical_procedures||'') + '\nADL：' + adlJsonToText(currentPatient.adl||'') + '\n特記事項：' + (currentPatient.notes||'') + '\n要介護度：' + (currentPatient.care_level||'') + '\n障害高齢者自立度：' + (currentPatient.independence_level||'') + '\n認知症自立度：' + (currentPatient.dementia_level||'');
 
     // 保存済み目標があれば使用、なければAIに生成させる
     var savedGoalLong = currentPatient.goal_long || '';
@@ -4154,7 +4234,7 @@ async function generateReport() {
 主病名：${currentPatient.main_diagnosis || ''}
 既往歴：${currentPatient.medical_history || ''}
 医療処置：${currentPatient.medical_procedures || ''}
-ADL：${currentPatient.adl || ''}
+ADL：${adlJsonToText(currentPatient.adl || '')}
 特記事項：${currentPatient.notes || ''}
 
 【対象期間】${year}年${parseInt(m)}月
