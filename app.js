@@ -3869,15 +3869,51 @@ async function generateEmergency() {
 
   try {
     var patientInfo = currentPatient
-      ? '患者名：' + currentPatient.name + '\n主病名：' + (currentPatient.main_diagnosis||'不明') + '\n既往歴：' + (currentPatient.medical_history||'不明') + '\n医療処置：' + (currentPatient.medical_procedures||'なし') + '\n生活状況：' + (currentPatient.living_situation||'') + '\nキーパーソン：' + (currentPatient.key_person||'') + '\n緊急連絡先：' + (currentPatient.emergency_contact||'') + '\n介護者・家族の状況：' + (currentPatient.caregiver_notes||'')
+      ? '患者名：' + currentPatient.name + '（' + (currentPatient.age||'不明') + '歳・' + (currentPatient.gender||'不明') + '）' +
+        '\n主病名：' + (currentPatient.main_diagnosis||'不明') +
+        '\n既往歴：' + (currentPatient.medical_history||'不明') +
+        '\n医療処置：' + (currentPatient.medical_procedures||'なし') +
+        '\nADL：' + adlJsonToText(currentPatient.adl||'') +
+        '\n内服薬：' + (currentPatient.medicines||'なし') +
+        '\n特記事項：' + (currentPatient.notes||'') +
+        '\n生活状況：' + (currentPatient.living_situation||'') +
+        '\nキーパーソン：' + (currentPatient.key_person||'') +
+        '\n緊急連絡先：' + (currentPatient.emergency_contact||'') +
+        '\n介護者・家族の状況：' + (currentPatient.caregiver_notes||'')
       : '患者情報なし（緊急電話対応中）';
 
-    var sysPrompt = 'あなたは経験豊富な訪問看護師です。患者情報と電話で受けた症状をもとに、以下の2項目のみ出力してください。\n\n' +
-      '【観察項目】\n症状・主病名・既往歴を踏まえた確認すべき項目を優先度順に8〜10項目（箇条書き）。バイタルサイン測定は省略すること。\n\n' +
-      '【注意点】\nこの患者の既往歴・医療処置・主病名を踏まえた現場での注意事項を2〜3点（箇条書き）';
-    var result = await callClaude(sysPrompt,
-      '【電話内容・症状メモ】\n' + memo + '\n\n【患者情報】\n' + patientInfo
-    );
+    // 直近5件の訪問記録のA欄を取得
+    var recentAssessments = '';
+    if (currentPatient) {
+      try {
+        var recentVisits = await supabaseFetch(
+          'visits?patient_id=eq.' + currentPatient.id + '&order=visit_date.desc&limit=5'
+        );
+        var aLines = recentVisits
+          .map(function(v) {
+            // assessment カラムがあればそれを使用、なければ content から【A：】部分を抽出
+            var aText = v.assessment || '';
+            if (!aText && v.content) {
+              var m = v.content.match(/【A[：:][^】]*】\s*([\s\S]*?)(?=【[SOAP]|$)/);
+              if (m) aText = m[1].trim();
+            }
+            return aText ? '【' + v.visit_date + '】' + aText : null;
+          })
+          .filter(Boolean);
+        if (aLines.length) recentAssessments = aLines.join('\n');
+      } catch(e) { /* 取得失敗はスキップ */ }
+    }
+
+    var sysPrompt = 'あなたは経験豊富な訪問看護師です。患者情報・直近の訪問記録・今回の症状をもとに以下の2項目のみ出力してください。\n\n' +
+      '【観察項目】\n今回の症状・主病名・既往歴・直近の記録を踏まえた確認すべき項目を優先度順に8〜10項目（箇条書き）。バイタルサイン測定は省略すること。\n\n' +
+      '【注意点】\nこの患者固有の状況（性格・生活背景・介護状況・直近のアセスメント内容）を踏まえた現場での注意事項を3〜5点（箇条書き）。汎用的な教科書的注意点は書かない。この人だから注意すべきことを書く。\n\n' +
+      '【倫理的制約】\n・本人の意思・価値観・生活習慣を否定しない\n・患者の意向を軸にしながら家族の状況も視野に入れる\n・AIの出力はあくまで看護師の判断を補助するものであり最終判断は必ず担当看護師が行う';
+
+    var userMsg = '【電話内容・症状メモ】\n' + memo +
+      '\n\n【患者情報】\n' + patientInfo +
+      (recentAssessments ? '\n\n【直近の訪問記録（A欄）】\n' + recentAssessments : '');
+
+    var result = await callClaude(sysPrompt, userMsg);
 
     document.getElementById('emergency-items').textContent = result;
     document.getElementById('emergency-output').style.display = '';
