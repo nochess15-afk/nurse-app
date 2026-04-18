@@ -1633,8 +1633,8 @@ async function generateAssessment() {
     document.getElementById('assessment-output').style.display = '';
     document.getElementById('assessment-output').scrollIntoView({ behavior: 'smooth' });
 
-    // 【A欄の記載例】部分だけ抽出してSOAPのA欄に挿入
-    var aExampleMarker = '【A欄の記載例（参考）】';
+    // 【アセスメント統合】部分だけ抽出してSOAPのA欄に挿入
+    var aExampleMarker = '■ アセスメント統合';
     var aOnlyText = result;
     if (result.includes(aExampleMarker)) {
       var aExStart = result.indexOf(aExampleMarker) + aExampleMarker.length;
@@ -1771,8 +1771,8 @@ function applyAssessment(btn) {
   var reply = window.currentAssessment;
   if (!reply) return;
 
-  // 【A欄の記載例】部分だけ抽出
-  var aExampleMarker = '【A欄の記載例（参考）】';
+  // 【アセスメント統合】部分だけ抽出
+  var aExampleMarker = '■ アセスメント統合';
   var aOnlyText = reply;
   if (reply.includes(aExampleMarker)) {
     var aExStart = reply.indexOf(aExampleMarker) + aExampleMarker.length;
@@ -3075,14 +3075,14 @@ function copyAssessmentSection(section) {
     navigator.clipboard.writeText(extracted).then(function() { showStatus('✅ 記録の整理をコピーしました（O欄が見つからないためクリップボードへ）'); });
 
   } else if (section === 'A') {
-    // 「A欄の記載例」セクションを抽出
-    var aExampleMarker = '【A欄の記載例（参考）】';
+    // 「アセスメント統合」セクションを抽出
+    var aExampleMarker = '■ アセスメント統合';
     var start2 = fullText.indexOf(aExampleMarker);
     if (start2 >= 0) {
       extracted = fullText.substring(start2 + aExampleMarker.length).trim();
       extracted = extracted.replace(/※判断・表現は担当看護師が行ってください[。]*/g, '').trim();
     } else {
-      showStatus('⚠️「A欄の記載例」セクションが見つかりません'); return;
+      showStatus('⚠️「アセスメント統合」セクションが見つかりません'); return;
     }
 
     // A欄のマーカーを複数パターンで検索
@@ -3101,16 +3101,16 @@ function copyAssessmentSection(section) {
     if (aStart2 >= 0 && pStart > aStart2) {
       var newContent2 = visitContent.substring(0, aStart2) + '\n' + extracted + '\n' + visitContent.substring(pStart);
       document.getElementById('visit-content').value = newContent2;
-      showStatus('✅ A欄の記載例をA欄に挿入しました');
+      showStatus('✅ アセスメント統合をA欄に挿入しました');
       return;
     } else if (aStart2 >= 0) {
       // Pがない場合はAの後に追記
       var newContent3 = visitContent.substring(0, aStart2) + '\n' + extracted;
       document.getElementById('visit-content').value = newContent3;
-      showStatus('✅ A欄の記載例をA欄に挿入しました');
+      showStatus('✅ アセスメント統合をA欄に挿入しました');
       return;
     }
-    navigator.clipboard.writeText(extracted).then(function() { showStatus('✅ A欄の記載例をコピーしました（A欄が見つからないためクリップボードへ）'); });
+    navigator.clipboard.writeText(extracted).then(function() { showStatus('✅ アセスメント統合をコピーしました（A欄が見つからないためクリップボードへ）'); });
   }
 }
 
