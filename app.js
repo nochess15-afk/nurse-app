@@ -1034,6 +1034,10 @@ async function savePatient() {
   try {
     const medicines = document.getElementById('reg-medicines') ? document.getElementById('reg-medicines').value.trim() : '';
     const nurse = document.getElementById('reg-nurse') ? document.getElementById('reg-nurse').value.trim() : '';
+    const livingSituation = document.getElementById('reg-living-situation') ? document.getElementById('reg-living-situation').value.trim() : '';
+    const keyPerson = document.getElementById('reg-key-person') ? document.getElementById('reg-key-person').value.trim() : '';
+    const emergencyContact = document.getElementById('reg-emergency-contact') ? document.getElementById('reg-emergency-contact').value.trim() : '';
+    const caregiverNotes = document.getElementById('reg-caregiver-notes') ? document.getElementById('reg-caregiver-notes').value.trim() : '';
     // 観察項目を収集
     var allObsItems = COMMON_ITEMS.slice();
     var diseaseObsResult = getDiseaseItems(diagnosis);
@@ -1050,7 +1054,11 @@ async function savePatient() {
       adl: adl || null,
       notes: notes || null,
       medicines: medicines || null,
-      observation_items: allObsItems.length ? allObsItems.join('\n') : null
+      observation_items: allObsItems.length ? allObsItems.join('\n') : null,
+      living_situation: livingSituation || null,
+      key_person: keyPerson || null,
+      emergency_contact: emergencyContact || null,
+      caregiver_notes: caregiverNotes || null
     };
     if (window.editingPatientId) {
       await supabaseFetch('patients?id=eq.' + window.editingPatientId, 'PATCH', patientPayload);
@@ -1146,7 +1154,7 @@ async function analyzeMedicinePhoto() {
 }
 
 function clearRegForm() {
-  ['reg-name','reg-age','reg-gender','reg-nurse','reg-diagnosis','reg-history','reg-procedures','reg-adl','reg-notes','reg-medicines','reg-care-level','reg-independence','reg-dementia-level'].forEach(id => {
+  ['reg-name','reg-age','reg-gender','reg-nurse','reg-diagnosis','reg-history','reg-procedures','reg-adl','reg-notes','reg-medicines','reg-care-level','reg-independence','reg-dementia-level','reg-living-situation','reg-key-person','reg-emergency-contact','reg-caregiver-notes'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -1494,7 +1502,7 @@ async function generateAssessment() {
     // 今日入力中の記録も取得
     var todayRecord = document.getElementById('visit-content').value.trim();
 
-    var patientInfo = '【患者情報】\n氏名：' + currentPatient.name + '（' + (currentPatient.age||'不明') + '歳・' + (currentPatient.gender||'不明') + '）\n主病名：' + (currentPatient.main_diagnosis||'') + '\n既往歴：' + (currentPatient.medical_history||'') + '\n医療処置：' + (currentPatient.medical_procedures||'') + '\nADL：' + (currentPatient.adl||'') + '\n内服薬：' + (currentPatient.medicines||'なし') + '\n特記事項（生活背景・家族・介護状況等）：' + (currentPatient.notes||'');
+    var patientInfo = '【患者情報】\n氏名：' + currentPatient.name + '（' + (currentPatient.age||'不明') + '歳・' + (currentPatient.gender||'不明') + '）\n主病名：' + (currentPatient.main_diagnosis||'') + '\n既往歴：' + (currentPatient.medical_history||'') + '\n医療処置：' + (currentPatient.medical_procedures||'') + '\nADL：' + (currentPatient.adl||'') + '\n内服薬：' + (currentPatient.medicines||'なし') + '\n特記事項：' + (currentPatient.notes||'') + '\n生活状況：' + (currentPatient.living_situation||'') + '\nキーパーソン：' + (currentPatient.key_person||'') + '\n緊急連絡先：' + (currentPatient.emergency_contact||'') + '\n介護者・家族の状況：' + (currentPatient.caregiver_notes||'');
 
     var userContent = patientInfo +
       (todayRecord ? '\n\n【本日の記録（入力中）】\n' + todayRecord : '') +
@@ -2062,6 +2070,10 @@ async function savePatientOnly() {
     const careLevel2 = document.getElementById('reg-care-level') ? document.getElementById('reg-care-level').value : '';
     const independence2 = document.getElementById('reg-independence') ? document.getElementById('reg-independence').value : '';
     const dementiaLevel2 = document.getElementById('reg-dementia-level') ? document.getElementById('reg-dementia-level').value : '';
+    const livingSituation2 = document.getElementById('reg-living-situation') ? document.getElementById('reg-living-situation').value.trim() : '';
+    const keyPerson2 = document.getElementById('reg-key-person') ? document.getElementById('reg-key-person').value.trim() : '';
+    const emergencyContact2 = document.getElementById('reg-emergency-contact') ? document.getElementById('reg-emergency-contact').value.trim() : '';
+    const caregiverNotes2 = document.getElementById('reg-caregiver-notes') ? document.getElementById('reg-caregiver-notes').value.trim() : '';
     const payload = {
       name, age: age ? parseInt(age) : null,
       gender: gender || null,
@@ -2074,7 +2086,11 @@ async function savePatientOnly() {
       medicines: medicines || null,
       care_level: careLevel2 || null,
       independence_level: independence2 || null,
-      dementia_level: dementiaLevel2 || null
+      dementia_level: dementiaLevel2 || null,
+      living_situation: livingSituation2 || null,
+      key_person: keyPerson2 || null,
+      emergency_contact: emergencyContact2 || null,
+      caregiver_notes: caregiverNotes2 || null
     };
 
     if (window.editingPatientId) {
@@ -3079,6 +3095,14 @@ async function editPatientBtn(btn) {
     if (ilEl) ilEl.value = p.independence_level || '';
     var dlEl = document.getElementById('reg-dementia-level');
     if (dlEl) dlEl.value = p.dementia_level || '';
+    var lsEl = document.getElementById('reg-living-situation');
+    if (lsEl) lsEl.value = p.living_situation || '';
+    var kpEl = document.getElementById('reg-key-person');
+    if (kpEl) kpEl.value = p.key_person || '';
+    var ecEl = document.getElementById('reg-emergency-contact');
+    if (ecEl) ecEl.value = p.emergency_contact || '';
+    var cnEl = document.getElementById('reg-caregiver-notes');
+    if (cnEl) cnEl.value = p.caregiver_notes || '';
 
     // 編集モードのIDを保持・保存ボタンのテキスト変更
     window.editingPatientId = id;
@@ -3115,6 +3139,10 @@ function togglePatientDetail() {
       { label: '医療処置', value: p.medical_procedures },
       { label: 'ADL', value: p.adl },
       { label: '特記事項', value: p.notes },
+      { label: '生活状況', value: p.living_situation },
+      { label: 'キーパーソン', value: p.key_person },
+      { label: '緊急連絡先', value: p.emergency_contact },
+      { label: '介護者・家族の状況', value: p.caregiver_notes },
     ].filter(function(r) { return r.value; });
 
     var html = rows.map(function(r) {
@@ -3155,6 +3183,14 @@ function editCurrentPatient() {
   document.getElementById('reg-notes').value = p.notes || '';
   var medEl = document.getElementById('reg-medicines');
   if (medEl) medEl.value = p.medicines || '';
+  var lsEl2 = document.getElementById('reg-living-situation');
+  if (lsEl2) lsEl2.value = p.living_situation || '';
+  var kpEl2 = document.getElementById('reg-key-person');
+  if (kpEl2) kpEl2.value = p.key_person || '';
+  var ecEl2 = document.getElementById('reg-emergency-contact');
+  if (ecEl2) ecEl2.value = p.emergency_contact || '';
+  var cnEl2 = document.getElementById('reg-caregiver-notes');
+  if (cnEl2) cnEl2.value = p.caregiver_notes || '';
 
   window.editingPatientId = p.id;
   var saveBtn = document.querySelector('button[onclick="savePatient()"]');
@@ -3717,7 +3753,7 @@ async function generateEmergency() {
 
   try {
     var patientInfo = currentPatient
-      ? '患者名：' + currentPatient.name + '\n主病名：' + (currentPatient.main_diagnosis||'不明') + '\n既往歴：' + (currentPatient.medical_history||'不明') + '\n医療処置：' + (currentPatient.medical_procedures||'なし')
+      ? '患者名：' + currentPatient.name + '\n主病名：' + (currentPatient.main_diagnosis||'不明') + '\n既往歴：' + (currentPatient.medical_history||'不明') + '\n医療処置：' + (currentPatient.medical_procedures||'なし') + '\n生活状況：' + (currentPatient.living_situation||'') + '\nキーパーソン：' + (currentPatient.key_person||'') + '\n緊急連絡先：' + (currentPatient.emergency_contact||'') + '\n介護者・家族の状況：' + (currentPatient.caregiver_notes||'')
       : '患者情報なし（緊急電話対応中）';
 
     var sysPrompt = 'あなたは経験豊富な訪問看護師です。患者情報と電話で受けた症状をもとに、以下の2項目のみ出力してください。\n\n' +
