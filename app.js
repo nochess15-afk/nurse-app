@@ -1421,8 +1421,8 @@ function renderVisits() {
     var sdate = (v.visit_date || '').replace(/'/g, '');
     html += '<div class="visit-card fade-in">';
     html += '<div class="visit-card-header" style="flex-direction:column;align-items:flex-start;gap:8px">';
-    html += '<div class="visit-date-label">📅 ' + (v.visit_date || '') + '</div>';
-    html += '<div style="display:flex;gap:6px">';
+    html += '<div class="visit-date-label" style="white-space:nowrap">📅 ' + (v.visit_date || '').replace(/-/g, '/') + '</div>';
+    html += '<div style="display:flex;gap:6px;flex-shrink:0">';
     html += '<button class="btn btn-secondary btn-sm" onclick="copyVisitContent(\'' + sid + '\')" title="記録内容をコピー">📋 記録</button>';
     html += '<button class="btn btn-secondary btn-sm" onclick="editVisit(\'' + sid + '\',\'' + sdate + '\',this)">✏️ 編集</button>';
     html += '<button class="btn btn-sm" onclick="deleteVisit(\'' + sid + '\',\'' + sdate + '\')" style="background:#fdf0f0;color:#d94f4f;border:1px solid #f0b0b0;font-size:12px">🗑️ 削除</button>';
