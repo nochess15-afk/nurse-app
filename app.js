@@ -639,7 +639,6 @@ function renderPatientList(patients) {
     container.innerHTML = '<div class="patient-list">' + patients.map(function(p) {
       return '<div class="patient-item fade-in" style="position:relative">' +
         '<div style="flex:1;display:flex;align-items:center;gap:10px;cursor:pointer" data-id="' + p.id + '" onclick="selectPatientById(this)">' +
-        '<div class="patient-avatar">' + (p.gender === '女性' ? '👩' : p.gender === '男性' ? '👨' : '🧑') + '</div>' +
         '<div class="patient-info">' +
         '<h3>' + p.name + '</h3>' +
         '<p>' + (p.age ? p.age + '歳・' : '') + (p.gender || '') + (p.main_diagnosis ? '・' + p.main_diagnosis : '') + (p.nurse ? ' 担当：' + p.nurse : '') + '</p>' +
