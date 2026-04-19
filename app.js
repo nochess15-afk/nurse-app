@@ -2900,7 +2900,11 @@ async function loadBulkPatientsList(type) {
   var list = document.getElementById(listId);
   if (!list) return;
   try {
-    var patients = await supabaseFetch('patients?order=name.asc');
+    var staffName = currentStaffInfo ? currentStaffInfo.name : '';
+    var url = staffName
+      ? 'patients?order=name.asc&nurse=ilike.*' + encodeURIComponent(staffName) + '*'
+      : 'patients?order=name.asc';
+    var patients = await supabaseFetch(url);
     list.innerHTML = patients.map(function(p) {
       return '<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 8px;border-bottom:1px solid var(--border)">' +
         '<span style="font-size:13px;font-weight:700">' + p.name + '</span>' +
