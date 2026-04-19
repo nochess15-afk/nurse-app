@@ -1420,13 +1420,12 @@ function renderVisits() {
     var sid = v.id.replace(/'/g, '');
     var sdate = (v.visit_date || '').replace(/'/g, '');
     html += '<div class="visit-card fade-in">';
-    html += '<div class="visit-card-header">';
+    html += '<div class="visit-card-header" style="flex-direction:column;align-items:flex-start;gap:8px">';
     html += '<div class="visit-date-label">📅 ' + (v.visit_date || '') + '</div>';
-    html += '<div style="display:flex;align-items:center;gap:6px;flex-wrap:nowrap">';
+    html += '<div style="display:flex;gap:6px">';
     html += '<button class="btn btn-secondary btn-sm" onclick="copyVisitContent(\'' + sid + '\')" title="記録内容をコピー">📋 記録</button>';
     html += '<button class="btn btn-secondary btn-sm" onclick="editVisit(\'' + sid + '\',\'' + sdate + '\',this)">✏️ 編集</button>';
     html += '<button class="btn btn-sm" onclick="deleteVisit(\'' + sid + '\',\'' + sdate + '\')" style="background:#fdf0f0;color:#d94f4f;border:1px solid #f0b0b0;font-size:12px">🗑️ 削除</button>';
-
     html += '</div></div>';
     if (v.staff_name) html += '<div style="font-size:11px;color:var(--primary);font-weight:700;margin-bottom:6px">👤 ' + v.staff_name + '</div>';
     if (v.content) html += '<p style="font-size:14px;margin-bottom:8px;white-space:pre-wrap">' + v.content + '</p>';
