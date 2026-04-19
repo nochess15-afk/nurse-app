@@ -627,7 +627,8 @@
 .vital-input[type=number] {
   -moz-appearance: textfield;
 }
-input[type="date"] {
+input[type="date"],
+input[type="month"] {
   -webkit-appearance: none;
   appearance: none;
   text-align: center;
@@ -635,4 +636,15 @@ input[type="date"] {
   direction: ltr;
   width: 100%;
   box-sizing: border-box;
+}
+.bulk-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  align-items: start;
+}
+@media (min-width: 768px) {
+  .bulk-grid {
+    grid-template-columns: 240px 1fr;
+  }
 }

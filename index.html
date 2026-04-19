@@ -930,7 +930,7 @@
 
 <!-- ===== 一括計画書タブ ===== -->
   <div class="tab-panel" id="panel-bulk-keikaku">
-    <div style="display:grid;grid-template-columns:240px 1fr;gap:16px;align-items:start">
+    <div class="bulk-grid">
       <div class="card" style="position:sticky;top:140px">
         <div class="card-title">👥 患者を選択</div>
         <div style="display:flex;gap:6px;margin-bottom:10px">
@@ -944,11 +944,11 @@
         <hr class="divider">
         <div class="form-group">
           <label>評価対象月（記録を読む月）</label>
-          <input type="month" id="bulk-hyoka-month" style="font-size:13px;width:100%;box-sizing:border-box">
+          <input type="month" id="bulk-hyoka-month" style="font-size:13px">
         </div>
         <div class="form-group">
           <label>新計画書の報告日</label>
-          <input type="date" id="bulk-keikaku-date" style="font-size:13px;width:100%;box-sizing:border-box">
+          <input type="date" id="bulk-keikaku-date" style="font-size:13px">
         </div>
         <div style="font-size:11px;color:var(--text-secondary);margin-bottom:10px;line-height:1.6">
           💡 対象月の訪問記録を読み取り、前回の計画書に評価を付けて更新します
@@ -967,7 +967,7 @@
 
   <!-- ===== 一括報告書タブ ===== -->
   <div class="tab-panel" id="panel-bulk-hokoku">
-    <div style="display:grid;grid-template-columns:240px 1fr;gap:16px;align-items:start">
+    <div class="bulk-grid">
       <div class="card" style="position:sticky;top:140px">
         <div class="card-title">👥 患者を選択</div>
         <div style="display:flex;gap:6px;margin-bottom:10px">
@@ -981,7 +981,7 @@
         <hr class="divider">
         <div class="form-group">
           <label>対象年月</label>
-          <input type="month" id="bulk-month" style="font-size:13px;width:100%;box-sizing:border-box">
+          <input type="month" id="bulk-month" style="font-size:13px">
         </div>
         <button class="btn btn-accent btn-full" onclick="generateBulkDocs('hokoku')">
           🤖 一括報告書生成
