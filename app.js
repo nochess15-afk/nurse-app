@@ -676,13 +676,8 @@ async function selectPatient(p) {
 
   // 選択患者情報を表示（内服薬は右サイドカードのみ）
   document.getElementById('selected-patient-info').innerHTML =
-    '<div style="display:flex; align-items:center; gap:12px">' +
-    '<div class="patient-avatar" style="width:48px;height:48px;font-size:22px">' +
-    (p.gender === '女性' ? '👩' : p.gender === '男性' ? '👨' : '🧑') +
-    '</div><div>' +
     '<div style="font-size:17px; font-weight:700">' + p.name + '</div>' +
-    '<div style="font-size:13px; color:var(--text-secondary)">' + (p.age ? p.age + '歳・' : '') + (p.gender || '') + (p.main_diagnosis ? '・' + p.main_diagnosis : '') + '</div>' +
-    '</div></div>';
+    '<div style="font-size:13px; color:var(--text-secondary)">' + (p.age ? p.age + '歳・' : '') + (p.gender || '') + (p.main_diagnosis ? '・' + p.main_diagnosis : '') + '</div>';
 
   setTodayDate();
   var rm = document.getElementById('report-month'); if(rm) rm.value = getCurrentMonth();
@@ -2113,13 +2108,9 @@ async function saveMedicines() {
     }
 
     var info = document.getElementById('selected-patient-info');
-    var baseHtml = '<div style="display:flex; align-items:center; gap:12px">' +
-      '<div class="patient-avatar" style="width:48px;height:48px;font-size:22px">' +
-      (currentPatient.gender === '女性' ? '👩' : currentPatient.gender === '男性' ? '👨' : '🧑') +
-      '</div><div>' +
+    var baseHtml =
       '<div style="font-size:17px; font-weight:700">' + currentPatient.name + '</div>' +
-      '<div style="font-size:13px; color:var(--text-secondary)">' + (currentPatient.age ? currentPatient.age + '歳・' : '') + (currentPatient.gender || '') + (currentPatient.main_diagnosis ? '・' + currentPatient.main_diagnosis : '') + '</div>' +
-      '</div></div>';
+      '<div style="font-size:13px; color:var(--text-secondary)">' + (currentPatient.age ? currentPatient.age + '歳・' : '') + (currentPatient.gender || '') + (currentPatient.main_diagnosis ? '・' + currentPatient.main_diagnosis : '') + '</div>';
     info.innerHTML = baseHtml;
 
     document.getElementById('medicine-edit-area').style.display = 'none';
@@ -2167,13 +2158,9 @@ async function saveMedicinesSide() {
     }
     var info = document.getElementById('selected-patient-info');
     if (info) {
-      var baseHtml = '<div style="display:flex; align-items:center; gap:12px">' +
-        '<div class="patient-avatar" style="width:48px;height:48px;font-size:22px">' +
-        (currentPatient.gender === '女性' ? '👩' : currentPatient.gender === '男性' ? '👨' : '🧑') +
-        '</div><div>' +
+      var baseHtml =
         '<div style="font-size:17px; font-weight:700">' + currentPatient.name + '</div>' +
-        '<div style="font-size:13px; color:var(--text-secondary)">' + (currentPatient.age ? currentPatient.age + '歳・' : '') + (currentPatient.gender || '') + (currentPatient.main_diagnosis ? '・' + currentPatient.main_diagnosis : '') + '</div>' +
-        '</div></div>';
+        '<div style="font-size:13px; color:var(--text-secondary)">' + (currentPatient.age ? currentPatient.age + '歳・' : '') + (currentPatient.gender || '') + (currentPatient.main_diagnosis ? '・' + currentPatient.main_diagnosis : '') + '</div>';
       info.innerHTML = baseHtml;
     }
 
