@@ -937,6 +937,10 @@
           <button class="btn btn-secondary btn-sm" style="flex:1;font-size:11px" onclick="bulkSelectAll('keikaku',true)">全選択</button>
           <button class="btn btn-secondary btn-sm" style="flex:1;font-size:11px" onclick="bulkSelectAll('keikaku',false)">全解除</button>
         </div>
+        <div style="display:flex;gap:8px;margin-bottom:10px;">
+          <input type="text" id="bulk-keikaku-search" placeholder="患者名で検索して追加..." style="flex:1;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:13px;">
+          <button class="btn btn-secondary" style="font-size:12px;padding:8px 14px;" onclick="bulkSearchPatient('keikaku')">追加</button>
+        </div>
         <div id="bulk-keikaku-patient-list" style="display:flex;flex-direction:column;max-height:400px;overflow-y:auto"></div>
         <hr class="divider">
         <div class="form-group">
@@ -970,6 +974,10 @@
         <div style="display:flex;gap:6px;margin-bottom:10px">
           <button class="btn btn-secondary btn-sm" style="flex:1;font-size:11px" onclick="bulkSelectAll('hokoku',true)">全選択</button>
           <button class="btn btn-secondary btn-sm" style="flex:1;font-size:11px" onclick="bulkSelectAll('hokoku',false)">全解除</button>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:10px;">
+          <input type="text" id="bulk-hokoku-search" placeholder="患者名で検索して追加..." style="flex:1;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:13px;">
+          <button class="btn btn-secondary" style="font-size:12px;padding:8px 14px;" onclick="bulkSearchPatient('hokoku')">追加</button>
         </div>
         <div id="bulk-hokoku-patient-list" style="display:flex;flex-direction:column;max-height:400px;overflow-y:auto"></div>
         <hr class="divider">

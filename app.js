@@ -2914,6 +2914,31 @@ async function loadBulkPatientsList(type) {
   } catch(e) { console.error(e); }
 }
 
+async function bulkSearchPatient(type) {
+  var input = document.getElementById('bulk-' + type + '-search');
+  var query = input.value.trim();
+  if (!query) return;
+
+  var patients = await supabaseFetch('patients?name=ilike.*' + encodeURIComponent(query) + '*&order=name.asc&limit=10');
+  if (!patients || patients.length === 0) { showStatus('⚠️ 患者が見つかりません'); return; }
+
+  var listEl = document.getElementById('bulk-' + type + '-patient-list');
+
+  patients.forEach(function(p) {
+    if (listEl.querySelector('input[data-id="' + p.id + '"]')) return;
+
+    var div = document.createElement('div');
+    div.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid var(--border);';
+    div.innerHTML = '<input type="checkbox" data-id="' + p.id + '" data-name="' + p.name + '" checked style="width:16px;height:16px;">' +
+      '<span style="font-size:13px;">' + p.name + '（' + (p.age||'?') + '歳・' + (p.main_diagnosis||'') + '）</span>' +
+      '<span style="font-size:11px;color:var(--text-secondary);margin-left:auto;">追加</span>';
+    listEl.appendChild(div);
+  });
+
+  input.value = '';
+  showStatus('✅ 追加しました');
+}
+
 function bulkSelectAll(type, checked) {
   var listId = type === 'keikaku' ? 'bulk-keikaku-patient-list' : 'bulk-hokoku-patient-list';
   document.querySelectorAll('#' + listId + ' input[type=checkbox]').forEach(function(cb) {
