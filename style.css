@@ -627,3 +627,8 @@
 .vital-input[type=number] {
   -moz-appearance: textfield;
 }
+input[type="date"] {
+  text-align: center;
+  width: 100%;
+  box-sizing: border-box;
+}
