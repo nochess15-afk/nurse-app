@@ -628,7 +628,11 @@
   -moz-appearance: textfield;
 }
 input[type="date"] {
+  -webkit-appearance: none;
+  appearance: none;
   text-align: center;
+  text-align-last: center;
+  direction: ltr;
   width: 100%;
   box-sizing: border-box;
 }
