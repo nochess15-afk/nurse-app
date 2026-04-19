@@ -745,6 +745,16 @@ async function selectPatient(p) {
   if (consDisp) consDisp.textContent = '清明';
   var cons = document.getElementById('vt-consciousness');
   if (cons) cons.value = '清明';
+  showKarteView();
+}
+
+function showKarteView() {
+  document.getElementById('view-karte').style.display = '';
+  document.getElementById('view-record').style.display = 'none';
+}
+function showRecordView() {
+  document.getElementById('view-karte').style.display = 'none';
+  document.getElementById('view-record').style.display = '';
 }
 
 // ===== 共通必須観察項目（疾患問わず毎回確認） =====

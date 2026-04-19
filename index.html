@@ -484,6 +484,9 @@
 
   <!-- ===== 訪問記録タブ ===== -->
   <div class="tab-panel" id="panel-record">
+
+  <!-- カルテビュー -->
+  <div id="view-karte">
     <div class="card" id="current-patient-card">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
         <div class="card-title" style="margin-bottom:0">👤 選択中の患者</div>
@@ -516,6 +519,24 @@
         </div>
       </div>
     </div>
+
+    <!-- 過去の記録一覧 -->
+    <div class="card">
+      <div class="card-title">📋 過去の訪問記録</div>
+      <div id="visits-list">
+        <div class="empty-state">
+          <div class="icon">📋</div>
+          <p>記録を読み込み中...</p>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn btn-primary btn-full" onclick="showRecordView()" style="margin-top:8px;margin-bottom:4px">📝 記録を書く</button>
+  </div><!-- end view-karte -->
+
+  <!-- 記録ビュー -->
+  <div id="view-record" style="display:none">
+    <button class="btn btn-secondary btn-sm" onclick="showKarteView()" style="margin-bottom:16px">← カルテに戻る</button>
 
     <div style="display:grid;grid-template-columns:1fr 280px;gap:16px;align-items:start">
     <div class="card">
@@ -695,10 +716,6 @@
     </div>
     </div><!-- end 2col grid -->
 
-
-
-    <!-- 緊急対応 -->
-    <div class="card" >
     <!-- AIアセスメント・リハビリ計画書 -->
     <div class="card">
       <div class="card-title">🧠 AI書類生成</div>
@@ -760,18 +777,7 @@
 
 
 
-    <!-- 過去の記録一覧 -->
-    <div class="card">
-      <div class="card-title">📋 過去の訪問記録</div>
-      <div id="visits-list">
-        <div class="empty-state">
-          <div class="icon">📋</div>
-          <p>記録を読み込み中...</p>
-        </div>
-      </div>
-    </div>
-
-  </div>
+  </div><!-- end view-record -->
   </div><!-- panel-record end -->
 
     <!-- ===== 計画書タブ ===== -->
