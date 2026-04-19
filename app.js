@@ -1024,6 +1024,75 @@ function parseMedicinesList(str) {
   return str.split(',').map(function(s) { return s.trim(); }).filter(Boolean);
 }
 
+// HTML特殊文字エスケープ
+function escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// 内服薬行UIをレンダリング（番号＋入力欄＋×ボタン）
+function renderMedicineRows(containerId, medicines) {
+  var container = document.getElementById(containerId);
+  if (!container) return;
+  var list = parseMedicinesList(medicines || '');
+  container.innerHTML = list.map(function(med, i) {
+    var val = med.replace(/^\d+\.\s*/, ''); // AI出力の先頭番号を除去
+    return '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px" class="med-row">' +
+      '<span style="color:var(--primary);font-weight:700;min-width:20px;font-size:13px;flex-shrink:0">' + (i+1) + '.</span>' +
+      '<input type="text" value="' + escHtml(val) + '" placeholder="薬剤名 用量 用法" ' +
+      'style="flex:1;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px">' +
+      '<button type="button" onclick="removeMedicineRow(this,\'' + containerId + '\')" ' +
+      'style="background:none;border:none;color:#ef4444;font-size:18px;line-height:1;cursor:pointer;padding:0 4px;flex-shrink:0">×</button>' +
+      '</div>';
+  }).join('');
+}
+
+// 行番号を再採番
+function reindexMedicineRows(containerId) {
+  var container = document.getElementById(containerId);
+  if (!container) return;
+  container.querySelectorAll('.med-row').forEach(function(row, i) {
+    var num = row.querySelector('span');
+    if (num) num.textContent = (i+1) + '.';
+  });
+}
+
+// 空行を追加
+function addMedicineRow(containerId) {
+  var container = document.getElementById(containerId);
+  if (!container) return;
+  var count = container.querySelectorAll('.med-row').length;
+  var div = document.createElement('div');
+  div.className = 'med-row';
+  div.style.cssText = 'display:flex;align-items:center;gap:6px;margin-bottom:4px';
+  div.innerHTML =
+    '<span style="color:var(--primary);font-weight:700;min-width:20px;font-size:13px;flex-shrink:0">' + (count+1) + '.</span>' +
+    '<input type="text" value="" placeholder="薬剤名 用量 用法" ' +
+    'style="flex:1;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px">' +
+    '<button type="button" onclick="removeMedicineRow(this,\'' + containerId + '\')" ' +
+    'style="background:none;border:none;color:#ef4444;font-size:18px;line-height:1;cursor:pointer;padding:0 4px;flex-shrink:0">×</button>';
+  container.appendChild(div);
+  div.querySelector('input').focus();
+}
+
+// 行を削除して再採番
+function removeMedicineRow(btn, containerId) {
+  var row = btn.closest('.med-row');
+  if (row) row.parentNode.removeChild(row);
+  reindexMedicineRows(containerId);
+}
+
+// 行から内服薬文字列を取得（改行結合）
+function getMedicinesFromRows(containerId) {
+  var container = document.getElementById(containerId);
+  if (!container) return '';
+  var lines = [];
+  container.querySelectorAll('.med-row input[type="text"]').forEach(function(inp) {
+    var v = inp.value.trim();
+    if (v) lines.push(v);
+  });
+  return lines.join('\n');
+}
+
 // ===== 患者登録 =====
 async function generateObservations() {
   const name = document.getElementById('reg-name').value.trim();
@@ -1149,7 +1218,7 @@ async function savePatient() {
   btn.innerHTML = '💾 保存中...';
 
   try {
-    const medicines = document.getElementById('reg-medicines') ? document.getElementById('reg-medicines').value.trim() : '';
+    const medicines = getMedicinesFromRows('reg-medicines-rows');
     const nurse = document.getElementById('reg-nurse') ? document.getElementById('reg-nurse').value.trim() : '';
     const livingSituation = document.getElementById('reg-living-situation') ? document.getElementById('reg-living-situation').value.trim() : '';
     const keyPerson = document.getElementById('reg-key-person') ? document.getElementById('reg-key-person').value.trim() : '';
@@ -1256,8 +1325,8 @@ async function analyzeMedicinePhoto() {
     var data = await response.json();
     var result = data.content[0].text;
 
-    var current = document.getElementById('reg-medicines').value.trim();
-    document.getElementById('reg-medicines').value = current ? current + '\n' + result : result;
+    var current = getMedicinesFromRows('reg-medicines-rows');
+    renderMedicineRows('reg-medicines-rows', current ? current + '\n' + result : result);
     showStatus('✅ お薬手帳を読み取りました！内容を確認してください');
     document.getElementById('medicine-preview').style.display = 'none';
     document.getElementById('medicine-photo-name').textContent = 'ファイル未選択';
@@ -1271,7 +1340,8 @@ async function analyzeMedicinePhoto() {
 }
 
 function clearRegForm() {
-  ['reg-name','reg-age','reg-gender','reg-nurse','reg-diagnosis','reg-history','reg-procedures','reg-adl','reg-notes','reg-medicines','reg-care-level','reg-independence','reg-dementia-level','reg-living-situation','reg-key-person','reg-emergency-contact','reg-caregiver-notes'].forEach(id => {
+  renderMedicineRows('reg-medicines-rows', '');
+  ['reg-name','reg-age','reg-gender','reg-nurse','reg-diagnosis','reg-history','reg-procedures','reg-adl','reg-notes','reg-care-level','reg-independence','reg-dementia-level','reg-living-situation','reg-key-person','reg-emergency-contact','reg-caregiver-notes'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -1991,8 +2061,7 @@ function toggleMedicineEdit() {
   var isHidden = area.style.display === 'none';
   area.style.display = isHidden ? '' : 'none';
   if (isHidden && currentPatient) {
-    var input = document.getElementById('medicine-edit-input-side') || document.getElementById('medicine-edit-input');
-    if (input) input.value = currentPatient.medicines || '';
+    renderMedicineRows('medicine-edit-rows-side', currentPatient.medicines || '');
   }
 }
 
@@ -2055,8 +2124,7 @@ async function saveMedicines() {
 
 async function saveMedicinesSide() {
   if (!currentPatient) return;
-  var input = document.getElementById('medicine-edit-input-side') || document.getElementById('medicine-edit-input');
-  var medicines = input ? input.value.trim() : '';
+  var medicines = getMedicinesFromRows('medicine-edit-rows-side');
 
   try {
     await supabaseFetch('patients?id=eq.' + currentPatient.id, 'PATCH', { medicines: medicines || null });
@@ -2192,7 +2260,7 @@ async function savePatientOnly() {
     const adl = document.getElementById('reg-adl').value.trim();
     const notes = document.getElementById('reg-notes').value.trim();
     const nurse = document.getElementById('reg-nurse') ? document.getElementById('reg-nurse').value.trim() : '';
-    const medicines = document.getElementById('reg-medicines') ? document.getElementById('reg-medicines').value.trim() : '';
+    const medicines = getMedicinesFromRows('reg-medicines-rows');
 
     const careLevel2 = document.getElementById('reg-care-level') ? document.getElementById('reg-care-level').value : '';
     const independence2 = document.getElementById('reg-independence') ? document.getElementById('reg-independence').value : '';
@@ -2358,7 +2426,7 @@ async function analyzeDocument() {
     if (parsed.procedures) document.getElementById('reg-procedures').value = parsed.procedures;
     if (parsed.adl) document.getElementById('reg-adl').value = parsed.adl;
     if (parsed.notes) document.getElementById('reg-notes').value = parsed.notes;
-    if (parsed.medicines) document.getElementById('reg-medicines').value = parsed.medicines;
+    if (parsed.medicines) renderMedicineRows('reg-medicines-rows', parsed.medicines);
     if (parsed.care_level) { var cl = document.getElementById('reg-care-level'); if(cl) cl.value = parsed.care_level; }
     if (parsed.independence_level) { var il = document.getElementById('reg-independence'); if(il) il.value = parsed.independence_level; }
     if (parsed.dementia_level) { var dl = document.getElementById('reg-dementia-level'); if(dl) dl.value = parsed.dementia_level; }
@@ -3214,8 +3282,7 @@ async function editPatientBtn(btn) {
     document.getElementById('reg-procedures').value = p.medical_procedures || '';
     setAdlFromJson(p.adl || '');
     document.getElementById('reg-notes').value = p.notes || '';
-    var medEl = document.getElementById('reg-medicines');
-    if (medEl) medEl.value = p.medicines || '';
+    renderMedicineRows('reg-medicines-rows', p.medicines || '');
     var clEl = document.getElementById('reg-care-level');
     if (clEl) clEl.value = p.care_level || '';
     var ilEl = document.getElementById('reg-independence');
@@ -3308,8 +3375,7 @@ function editCurrentPatient() {
   document.getElementById('reg-procedures').value = p.medical_procedures || '';
   setAdlFromJson(p.adl || '');
   document.getElementById('reg-notes').value = p.notes || '';
-  var medEl = document.getElementById('reg-medicines');
-  if (medEl) medEl.value = p.medicines || '';
+  renderMedicineRows('reg-medicines-rows', p.medicines || '');
   var lsEl2 = document.getElementById('reg-living-situation');
   if (lsEl2) lsEl2.value = p.living_situation || '';
   var kpEl2 = document.getElementById('reg-key-person');
