@@ -268,7 +268,7 @@
     transform: none !important;
   }
   .btn-full { width: 100%; justify-content: center; }
-  .btn-sm { font-size: 12px; padding: 7px 14px; }
+  .btn-sm { font-size: 11px; padding: 5px 10px; }
 
   /* ローディング */
   .loading-dot {
