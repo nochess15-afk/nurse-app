@@ -712,8 +712,8 @@ async function selectPatient(p) {
   // 内服薬サイドリストを更新
   var sideList = document.getElementById('medicine-side-list');
   if (sideList) {
-    if (p.medicines) {
-      var medLines = p.medicines.split('\n').filter(Boolean);
+    var medLines = parseMedicinesList(p.medicines);
+    if (medLines.length) {
       sideList.innerHTML = '<div style="display:flex;flex-direction:column;gap:6px">' +
         medLines.map(function(med, i) {
           return '<div style="display:flex;align-items:baseline;gap:6px;font-size:12px;padding:4px 0;border-bottom:1px solid var(--border)">' +
@@ -1017,6 +1017,13 @@ function adlJsonToText(str) {
   return Object.keys(obj).map(function(k) { return k + '：' + obj[k]; }).join('、');
 }
 
+// 内服薬文字列を配列に変換（改行区切り優先、なければカンマ区切り）
+function parseMedicinesList(str) {
+  if (!str) return [];
+  if (str.indexOf('\n') >= 0) return str.split('\n').filter(Boolean);
+  return str.split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+}
+
 // ===== 患者登録 =====
 async function generateObservations() {
   const name = document.getElementById('reg-name').value.trim();
@@ -1239,7 +1246,7 @@ async function analyzeMedicinePhoto() {
             },
             {
               type: 'text',
-              text: 'このお薬手帳の画像から内服薬の一覧を読み取ってください。薬名・用量・用法・服用タイミングをリスト形式で出力してください。形式：「薬名 用量 回数 タイミング」を1行1薬で。読み取れない場合はその旨を伝えてください。余分な説明は不要です。'
+              text: 'このお薬手帳の画像から内服薬の一覧を読み取ってください。以下の形式で番号付きリストとして出力してください。\n1. 薬剤名 用量 用法\n2. 薬剤名 用量 用法\n（以降同様）\n前置き・後置きの説明は不要です。読み取れない場合のみその旨を伝えてください。'
             }
           ]
         }]
@@ -2012,8 +2019,8 @@ async function saveMedicines() {
     // サイドの内服薬リストも更新
     var sideList = document.getElementById('medicine-side-list');
     if (sideList) {
-      if (medicines) {
-        var medList2 = medicines.split('\n').filter(Boolean);
+      var medList2 = parseMedicinesList(medicines);
+      if (medList2.length) {
         sideList.innerHTML = '<div style="display:flex;flex-direction:column;gap:6px">' +
           medList2.map(function(med, i) {
             return '<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg);border-radius:6px;font-size:12px">' +
@@ -2058,8 +2065,8 @@ async function saveMedicinesSide() {
     // サイドリストを更新
     var sideList = document.getElementById('medicine-side-list');
     if (sideList) {
-      if (medicines) {
-        var medList2 = medicines.split('\n').filter(Boolean);
+      var medList2 = parseMedicinesList(medicines);
+      if (medList2.length) {
         sideList.innerHTML = '<div style="display:flex;flex-direction:column;gap:6px">' +
           medList2.map(function(med, i) {
             return '<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg);border-radius:6px;font-size:12px">' +
