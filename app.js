@@ -2914,29 +2914,44 @@ async function loadBulkPatientsList(type) {
   } catch(e) { console.error(e); }
 }
 
-async function bulkSearchPatient(type) {
-  var input = document.getElementById('bulk-' + type + '-search');
-  var query = input.value.trim();
+function bulkSearchPatient(type) {
+  const input = document.getElementById('bulk-' + type + '-search');
+  const query = input.value.trim();
+  const existingSuggest = document.getElementById('bulk-' + type + '-suggest');
+  if (existingSuggest) existingSuggest.remove();
   if (!query) return;
 
-  var patients = await supabaseFetch('patients?name=ilike.*' + encodeURIComponent(query) + '*&order=name.asc&limit=10');
-  if (!patients || patients.length === 0) { showStatus('⚠️ 患者が見つかりません'); return; }
+  supabaseFetch('patients?name=ilike.*' + encodeURIComponent(query) + '*&order=name.asc&limit=10').then(function(patients) {
+    if (!patients || patients.length === 0) return;
 
-  var listEl = document.getElementById('bulk-' + type + '-patient-list');
+    const suggest = document.createElement('div');
+    suggest.id = 'bulk-' + type + '-suggest';
+    suggest.style.cssText = 'position:absolute;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-sm);z-index:100;width:100%;box-shadow:0 4px 12px rgba(0,0,0,0.12);max-height:200px;overflow-y:auto;';
 
-  patients.forEach(function(p) {
-    if (listEl.querySelector('input[data-id="' + p.id + '"]')) return;
+    patients.forEach(function(p) {
+      const item = document.createElement('div');
+      item.style.cssText = 'padding:8px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--border-light);';
+      item.textContent = p.name + '（' + (p.age||'?') + '歳・' + (p.main_diagnosis||'') + '）';
+      item.onmouseenter = function() { item.style.background = 'var(--primary-light,#e8f4fd)'; };
+      item.onmouseleave = function() { item.style.background = ''; };
+      item.onclick = function() {
+        const listEl = document.getElementById('bulk-' + type + '-patient-list');
+        if (!listEl.querySelector('input[data-id="' + p.id + '"]')) {
+          const div = document.createElement('div');
+          div.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid var(--border-light);';
+          div.innerHTML = '<input type="checkbox" data-id="' + p.id + '" data-name="' + p.name + '" checked style="width:16px;height:16px;">' +
+            '<span style="font-size:13px;">' + p.name + '（' + (p.age||'?') + '歳・' + (p.main_diagnosis||'') + '）</span>';
+          listEl.appendChild(div);
+        }
+        input.value = '';
+        suggest.remove();
+      };
+      suggest.appendChild(item);
+    });
 
-    var div = document.createElement('div');
-    div.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid var(--border);';
-    div.innerHTML = '<input type="checkbox" data-id="' + p.id + '" data-name="' + p.name + '" checked style="width:16px;height:16px;">' +
-      '<span style="font-size:13px;">' + p.name + '（' + (p.age||'?') + '歳・' + (p.main_diagnosis||'') + '）</span>' +
-      '<span style="font-size:11px;color:var(--text-secondary);margin-left:auto;">追加</span>';
-    listEl.appendChild(div);
+    input.parentElement.style.position = 'relative';
+    input.parentElement.appendChild(suggest);
   });
-
-  input.value = '';
-  showStatus('✅ 追加しました');
 }
 
 function bulkSelectAll(type, checked) {
