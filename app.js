@@ -637,10 +637,11 @@ function renderPatientList(patients) {
       return;
     }
     container.innerHTML = '<div class="patient-list">' + patients.map(function(p) {
+      var hasDrugWarning = p.notes && p.notes.includes('⚠️薬剤要確認');
       return '<div class="patient-item fade-in" style="position:relative">' +
         '<div style="flex:1;display:flex;align-items:center;gap:10px;cursor:pointer" data-id="' + p.id + '" onclick="selectPatientById(this)">' +
         '<div class="patient-info">' +
-        '<h3>' + p.name + '</h3>' +
+        '<h3 style="display:flex;align-items:center;gap:6px">' + p.name + (hasDrugWarning ? '<span style="font-size:10px;font-weight:700;background:#c0392b;color:white;padding:1px 6px;border-radius:10px;flex-shrink:0">⚠️薬剤</span>' : '') + '</h3>' +
         '<p>' + (p.age ? p.age + '歳・' : '') + (p.gender || '') + (p.main_diagnosis ? '・' + p.main_diagnosis : '') + (p.nurse ? ' 担当：' + p.nurse : '') + '</p>' +
         '</div>' +
         '<span style="color:var(--text-light);font-size:20px">›</span>' +
@@ -1234,6 +1235,28 @@ async function savePatient() {
     if (diseaseObsResult) allObsItems = allObsItems.concat(diseaseObsResult.items);
     if (observations && observations.length) allObsItems = allObsItems.concat(observations);
 
+    // 薬剤名安全チェック
+    var finalNotes = notes || null;
+    var drugCheckResult = null;
+    if (medicines) {
+      btn.innerHTML = '<span class="loading-dot"><span></span><span></span><span></span></span> 薬剤名を確認中...';
+      try {
+        var rawJson = await callClaude(
+          'あなたは薬剤名の検証AIです。JSONのみで返答してください。前置き・説明・マークダウン不要。',
+          '以下の薬剤リストに、日本で実在しない・読み取りエラーと思われる薬剤名が含まれていますか？\n' + medicines + '\n返答形式：{"suspicious": true/false, "names": ["疑わしい薬剤名1", ...]}'
+        );
+        var jsonStr = rawJson.trim().replace(/^```[a-z]*\n?/,'').replace(/\n?```$/,'');
+        drugCheckResult = JSON.parse(jsonStr);
+      } catch(e) {
+        // チェック失敗は無視して登録続行
+        drugCheckResult = null;
+      }
+    }
+
+    if (drugCheckResult && drugCheckResult.suspicious) {
+      finalNotes = '⚠️薬剤要確認\n' + (notes || '');
+    }
+
     const patientPayload = {
       name, age: age ? parseInt(age) : null,
       nurse: nurse || null,
@@ -1242,7 +1265,7 @@ async function savePatient() {
       medical_history: history || null,
       medical_procedures: procedures || null,
       adl: adl || null,
-      notes: notes || null,
+      notes: finalNotes,
       medicines: medicines || null,
       observation_items: allObsItems.length ? allObsItems.join('\n') : null,
       living_situation: livingSituation || null,
@@ -1264,6 +1287,12 @@ async function savePatient() {
     document.getElementById('obs-card').style.display = 'none';
     loadPatients();
     switchTab('patients');
+
+    if (drugCheckResult && drugCheckResult.suspicious && drugCheckResult.names && drugCheckResult.names.length) {
+      var ul = document.getElementById('drug-check-names');
+      ul.innerHTML = drugCheckResult.names.map(function(n) { return '<li>' + n + '</li>'; }).join('');
+      document.getElementById('drug-check-modal').style.display = 'flex';
+    }
 
   } catch(e) {
     showStatus('⚠️ 保存に失敗しました: ' + e.message, 5000);
@@ -1684,10 +1713,34 @@ async function deleteVisit(id, visitDate) {
 }
 
 // ===== AIアセスメント =====
+var _pendingAssessmentEvent = null;
+
+function proceedAssessmentAnyway() {
+  document.getElementById('assessment-drug-modal').style.display = 'none';
+  if (_pendingAssessmentEvent) {
+    _doGenerateAssessment(_pendingAssessmentEvent);
+    _pendingAssessmentEvent = null;
+  }
+}
+
 async function generateAssessment() {
   if (!currentPatient) { showStatus('⚠️ 患者を選択してください'); return; }
 
-  const btn = event.target;
+  if (currentPatient.notes && currentPatient.notes.includes('⚠️薬剤要確認')) {
+    _pendingAssessmentEvent = event;
+    document.getElementById('assessment-drug-modal').style.display = 'flex';
+    // 推奨ボタンにフォーカス
+    setTimeout(function() {
+      var recBtn = document.querySelector('#assessment-drug-modal button[autofocus]');
+      if (recBtn) recBtn.focus();
+    }, 50);
+    return;
+  }
+  _doGenerateAssessment(event);
+}
+
+async function _doGenerateAssessment(evt) {
+  const btn = evt.target;
   btn.disabled = true;
   btn.innerHTML = '<span class="loading-dot"><span></span><span></span><span></span></span> AIが分析中...';
 
