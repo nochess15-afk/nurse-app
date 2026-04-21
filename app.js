@@ -1251,6 +1251,7 @@ async function savePatient() {
 
   try {
     // ① フォームデータ収集
+    console.log('[savePatient] ① フォームデータ収集開始');
     const medicines = getMedicinesFromRows('reg-medicines-rows');
     const nurse = document.getElementById('reg-nurse') ? document.getElementById('reg-nurse').value.trim() : '';
     const livingSituation = document.getElementById('reg-living-situation') ? document.getElementById('reg-living-situation').value.trim() : '';
@@ -1278,9 +1279,10 @@ async function savePatient() {
       emergency_contact: emergencyContact || null,
       caregiver_notes: caregiverNotes || null
     };
+    console.log('[savePatient] payload:', patientPayload);
 
-    // ② Supabaseへ登録（最優先・薬剤チェックと完全に切り離し）
-    console.log('[savePatient] Supabase登録開始', patientPayload);
+    // ② Supabase insert/upsert
+    console.log('[savePatient] ② Supabase登録開始');
     var savedId = null;
     if (window.editingPatientId) {
       await supabaseFetch('patients?id=eq.' + window.editingPatientId, 'PATCH', patientPayload);
@@ -1292,50 +1294,51 @@ async function savePatient() {
       var inserted = await supabaseFetch('patients', 'POST', patientPayload);
       savedId = inserted && inserted[0] ? inserted[0].id : null;
     }
-    console.log('[savePatient] Supabase登録完了 id=', savedId);
+    console.log('[savePatient] ② Supabase登録完了 id=', savedId);
 
-    // 登録完了を先にUIへ反映
+    // ③ UI更新・画面遷移
     showStatus('✅ 患者情報を保存しました');
     clearRegForm();
     document.getElementById('obs-card').style.display = 'none';
     loadPatients();
     switchTab('patients');
+    console.log('[savePatient] ③ UI更新完了');
 
-    // ③ 薬剤チェック（後処理・失敗しても登録に影響しない）
-    if (medicines) {
-      console.log('[savePatient] 薬剤チェック開始');
-      btn.innerHTML = '<span class="loading-dot"><span></span><span></span><span></span></span> 薬剤名を確認中...';
-      btn.disabled = true;
-      try {
-        var rawJson = await callClaude(
-          'あなたは薬剤名の検証AIです。JSONのみで返答してください。前置き・説明・マークダウン不要。',
-          '以下の薬剤リストに、日本で実在しない・読み取りエラーと思われる薬剤名が含まれていますか？\n' + medicines + '\n返答形式：{"suspicious": true/false, "names": ["疑わしい薬剤名1", ...]}'
-        );
-        var jsonStr = rawJson.trim().replace(/^```[a-z]*\n?/, '').replace(/\n?```$/, '');
-        var drugCheckResult = JSON.parse(jsonStr);
-        console.log('[savePatient] 薬剤チェック結果', drugCheckResult);
-
-        // ④ suspicious: true ならメモリフラグを立ててモーダル表示（notes は汚染しない）
-        if (drugCheckResult.suspicious) {
-          if (savedId) suspiciousPatients.add(savedId);
-          if (drugCheckResult.names && drugCheckResult.names.length) {
-            var ul = document.getElementById('drug-check-names');
-            ul.innerHTML = drugCheckResult.names.map(function(n) { return '<li>・' + n + '</li>'; }).join('');
-            document.getElementById('drug-check-modal').style.display = 'flex';
-          }
-        }
-      } catch(drugErr) {
-        // 薬剤チェック失敗は無視（登録は既に完了）
-        console.warn('[savePatient] 薬剤チェック失敗（無視）', drugErr);
-      }
+    // ④ 薬剤チェックをfire-and-forget（awaitなし・savePatientをブロックしない）
+    if (medicines && savedId) {
+      checkMedicinesAsync(savedId, medicines);
     }
 
   } catch(e) {
-    console.error('[savePatient] 登録エラー', e);
+    console.error('[savePatient] 登録エラー:', e);
     showStatus('⚠️ 保存に失敗しました: ' + e.message, 5000);
   } finally {
     btn.disabled = false;
     btn.innerHTML = '💾 この患者を保存する';
+  }
+}
+
+// 薬剤チェック（savePatientから完全分離・fire-and-forget用）
+async function checkMedicinesAsync(patientId, medicines) {
+  try {
+    console.log('[checkMedicinesAsync] 薬剤チェック開始 patientId=', patientId);
+    var rawJson = await callClaude(
+      'あなたは薬剤名の検証AIです。JSONのみで返答してください。前置き・説明・マークダウン不要。',
+      '以下の薬剤リストに、日本で実在しない・読み取りエラーと思われる薬剤名が含まれていますか？\n' + medicines + '\n返答形式：{"suspicious": true/false, "names": ["疑わしい薬剤名1", ...]}'
+    );
+    var jsonStr = rawJson.trim().replace(/^```[a-z]*\n?/, '').replace(/\n?```$/, '');
+    var result = JSON.parse(jsonStr);
+    console.log('[checkMedicinesAsync] チェック結果:', result);
+    if (result.suspicious) {
+      suspiciousPatients.add(patientId);
+      if (result.names && result.names.length) {
+        var ul = document.getElementById('drug-check-names');
+        ul.innerHTML = result.names.map(function(n) { return '<li>・' + n + '</li>'; }).join('');
+        document.getElementById('drug-check-modal').style.display = 'flex';
+      }
+    }
+  } catch(e) {
+    console.error('[checkMedicinesAsync] 薬剤チェック失敗（登録には影響なし）:', e);
   }
 }
 
