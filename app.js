@@ -2509,7 +2509,24 @@ async function analyzeDocument() {
     if (parsed.procedures) document.getElementById('reg-procedures').value = parsed.procedures;
     if (parsed.adl)    document.getElementById('reg-adl').value = parsed.adl;
     if (parsed.notes)  document.getElementById('reg-notes').value = parsed.notes;
-    if (parsed.medicines) renderMedicineRows('reg-medicines-rows', parsed.medicines);
+
+    // 薬剤名をAIで正規化（失敗時は元テキストをそのまま使用）
+    if (parsed.medicines) {
+      var normalizedMedicines = parsed.medicines;
+      try {
+        var medRaw = await callClaude(
+          'あなたは日本の薬剤名の専門家です。OCRで誤認識された薬剤名を正しい日本の薬剤名に修正してください。JSONのみで返答。前置き・マークダウン不要。',
+          '以下はOCRで読み取った薬剤リストです。誤認識と思われる薬剤名を正しい日本の実在する薬剤名に修正してください。修正できない場合はそのままにしてください。\n' + parsed.medicines + '\n返答形式：{"medicines": "修正後の薬剤リスト（元の改行・用法はそのまま保持）"}'
+        );
+        var medJson = medRaw.trim().replace(/^```[a-z]*\n?/, '').replace(/\n?```$/, '');
+        var medResult = JSON.parse(medJson);
+        if (medResult.medicines) normalizedMedicines = medResult.medicines;
+        console.log('[analyzeDocument] 薬剤名正規化完了');
+      } catch(e) {
+        console.warn('[analyzeDocument] 薬剤名正規化失敗（元テキストを使用）:', e);
+      }
+      renderMedicineRows('reg-medicines-rows', normalizedMedicines);
+    }
     if (parsed.care_level) {
       var cl = document.getElementById('reg-care-level');
       if (cl) cl.value = parsed.care_level;
