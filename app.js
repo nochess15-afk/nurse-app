@@ -641,7 +641,7 @@ function renderPatientList(patients) {
       return '<div class="patient-item fade-in" style="position:relative">' +
         '<div style="flex:1;display:flex;align-items:center;gap:10px;cursor:pointer" data-id="' + p.id + '" onclick="selectPatientById(this)">' +
         '<div class="patient-info">' +
-        '<h3 style="display:flex;align-items:center;gap:6px">' + p.name + (hasDrugWarning ? '<span style="font-size:10px;font-weight:700;background:#c0392b;color:white;padding:1px 6px;border-radius:10px;flex-shrink:0">⚠️薬剤</span>' : '') + '</h3>' +
+        '<h3 style="display:flex;align-items:center;gap:6px">' + p.name + (hasDrugWarning ? '<span style="background:#dc2626;color:white;font-size:11px;padding:2px 6px;border-radius:4px;margin-left:6px;">⚠️薬剤</span>' : '') + '</h3>' +
         '<p>' + (p.age ? p.age + '歳・' : '') + (p.gender || '') + (p.main_diagnosis ? '・' + p.main_diagnosis : '') + (p.nurse ? ' 担当：' + p.nurse : '') + '</p>' +
         '</div>' +
         '<span style="color:var(--text-light);font-size:20px">›</span>' +
@@ -1290,7 +1290,7 @@ async function savePatient() {
 
     if (drugCheckResult && drugCheckResult.suspicious && drugCheckResult.names && drugCheckResult.names.length) {
       var ul = document.getElementById('drug-check-names');
-      ul.innerHTML = drugCheckResult.names.map(function(n) { return '<li>' + n + '</li>'; }).join('');
+      ul.innerHTML = drugCheckResult.names.map(function(n) { return '<li>・' + n + '</li>'; }).join('');
       document.getElementById('drug-check-modal').style.display = 'flex';
     }
 

@@ -1224,13 +1224,13 @@
 <!-- ===== 薬剤名警告モーダル（登録後） ===== -->
 <div id="drug-check-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:2000;align-items:center;justify-content:center;padding:20px">
   <div style="background:white;border-radius:var(--radius);max-width:480px;width:100%;box-shadow:var(--shadow-lg);overflow:hidden">
-    <div style="background:#c0392b;color:white;padding:14px 18px;display:flex;align-items:center;gap:10px">
+    <div style="background:#dc2626;color:white;padding:14px 18px;display:flex;align-items:center;gap:10px">
       <span style="font-size:20px">⚠️</span>
-      <span style="font-weight:700;font-size:15px">薬剤名に疑わしい記載があります</span>
+      <span style="font-weight:700;font-size:15px">⚠️ 薬剤名に疑わしい記載があります</span>
     </div>
     <div style="padding:18px">
       <p style="font-size:14px;margin-bottom:12px;color:var(--text)">登録は完了しましたが、以下の薬剤名が実在しない可能性があります：</p>
-      <ul id="drug-check-names" style="font-size:14px;color:var(--error);padding-left:16px;margin-bottom:14px;line-height:1.8"></ul>
+      <ul id="drug-check-names" style="font-size:14px;color:#dc2626;list-style:none;padding-left:0;margin-bottom:14px;line-height:1.8"></ul>
       <p style="font-size:13px;color:var(--text-secondary);margin-bottom:18px">お薬手帳の読み取りエラーが考えられます。<br>患者情報の「内服薬」を確認・修正してください。</p>
       <button class="btn btn-primary btn-full" onclick="document.getElementById('drug-check-modal').style.display='none'">閉じる</button>
     </div>
@@ -1240,15 +1240,15 @@
 <!-- ===== アセスメント生成前 薬剤未確認警告モーダル ===== -->
 <div id="assessment-drug-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:2000;align-items:center;justify-content:center;padding:20px">
   <div style="background:white;border-radius:var(--radius);max-width:460px;width:100%;box-shadow:var(--shadow-lg);overflow:hidden">
-    <div style="background:#e67e22;color:white;padding:14px 18px;display:flex;align-items:center;gap:10px">
+    <div style="background:#dc2626;color:white;padding:14px 18px;display:flex;align-items:center;gap:10px">
       <span style="font-size:20px">⚠️</span>
-      <span style="font-weight:700;font-size:15px">この患者の薬剤情報は未確認です</span>
+      <span style="font-weight:700;font-size:15px">⚠️ 薬剤情報が未確認です</span>
     </div>
     <div style="padding:18px">
       <p style="font-size:14px;color:var(--text);margin-bottom:18px">内服薬に誤認識の可能性がある薬剤名が登録されています。<br>薬剤情報を確認・修正してからアセスメントを生成することを推奨します。</p>
       <div style="display:flex;gap:10px;flex-direction:column">
-        <button id="assessment-drug-proceed-btn" class="btn btn-secondary btn-full" onclick="proceedAssessmentAnyway()" style="font-size:13px">それでも生成する</button>
         <button class="btn btn-primary btn-full" onclick="document.getElementById('assessment-drug-modal').style.display='none'" autofocus>閉じて確認する（推奨）</button>
+        <button id="assessment-drug-proceed-btn" class="btn btn-secondary btn-full" onclick="proceedAssessmentAnyway()" style="font-size:13px">それでも生成する</button>
       </div>
     </div>
   </div>
