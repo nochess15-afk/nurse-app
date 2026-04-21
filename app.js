@@ -1688,8 +1688,9 @@ async function editVisit(id, date, btn) {
       saveBtn.style.background = 'linear-gradient(135deg, #e8a838 0%, #f5c86a 100%)';
     }
 
-    // 入力欄までスクロール
-    document.getElementById('visit-date').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // 記録編集ビューに切り替えてからスクロール
+    showRecordView();
+    document.getElementById('view-record').scrollIntoView({ behavior: 'smooth', block: 'start' });
     showStatus('✅ 記録を読み込みました。修正して「更新」してください');
   } catch(e) {
     showStatus('⚠️ 読み込みに失敗しました: ' + e.message, 5000);
