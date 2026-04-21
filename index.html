@@ -1222,6 +1222,22 @@
 </div>
 
 
+<!-- ===== 薬剤名確認モーダル ===== -->
+<div id="med-check-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:2000;align-items:center;justify-content:center;padding:20px">
+  <div style="background:white;border-radius:var(--radius);max-width:460px;width:100%;box-shadow:var(--shadow-lg);overflow:hidden">
+    <div style="background:#dc2626;color:white;padding:14px 18px;display:flex;align-items:center;gap:10px">
+      <span style="font-size:18px">⚠️</span>
+      <span style="font-weight:700;font-size:15px">薬剤名を確認してください</span>
+    </div>
+    <div style="padding:18px">
+      <p style="font-size:14px;color:var(--text);margin-bottom:10px">以下の薬剤名が実在しない可能性があります：</p>
+      <ul id="med-check-names" style="list-style:none;padding:0;margin:0 0 14px;font-size:14px;color:#dc2626;line-height:1.9"></ul>
+      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:18px">内服薬を確認・修正してください。</p>
+      <button class="btn btn-primary btn-full" onclick="document.getElementById('med-check-modal').style.display='none'">閉じる</button>
+    </div>
+  </div>
+</div>
+
 <script src="app.js"></script>
 </body>
 </html>

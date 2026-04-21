@@ -1302,11 +1302,32 @@ async function savePatient() {
     loadPatients();
     switchTab('patients');
 
+    // ④ 薬剤チェック（fire-and-forget・登録をブロックしない）
+    if (medicines && savedId) checkMedicinesAsync(savedId, medicines);
+
   } catch(e) {
     showStatus('⚠️ 保存に失敗しました: ' + e.message, 5000);
   } finally {
     btn.disabled = false;
     btn.innerHTML = '💾 この患者を保存する';
+  }
+}
+
+async function checkMedicinesAsync(patientId, medicines) {
+  try {
+    var raw = await callClaude(
+      'あなたは薬剤名の検証AIです。JSONのみで返答。前置き・マークダウン不要。',
+      '以下の薬剤リストに日本で実在しない・読み取りエラーと思われる薬剤名が含まれていますか？\n' + medicines + '\n返答形式：{"suspicious":true/false,"names":["疑わしい薬剤名"]}'
+    );
+    var json = raw.trim().replace(/^```[a-z]*\n?/, '').replace(/\n?```$/, '');
+    var result = JSON.parse(json);
+    if (result.suspicious && result.names && result.names.length) {
+      var ul = document.getElementById('med-check-names');
+      ul.innerHTML = result.names.map(function(n) { return '<li>・' + n + '</li>'; }).join('');
+      document.getElementById('med-check-modal').style.display = 'flex';
+    }
+  } catch(e) {
+    console.warn('[checkMedicinesAsync] 薬剤チェック失敗（登録に影響なし）:', e);
   }
 }
 
