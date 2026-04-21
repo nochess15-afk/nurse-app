@@ -2404,26 +2404,27 @@ function readDocumentFile(input, type) {
 async function analyzeDocument() {
   if (!docFileData) { showStatus('⚠️ ファイルを選択してください'); return; }
 
+  console.log('[analyzeDocument] 開始 docFileType=', docFileType, 'データ長=', docFileData ? docFileData.length : 0);
+
   document.getElementById('doc-reading-status').style.display = '';
   document.getElementById('doc-preview').style.display = 'none';
 
   try {
-    // PDFも画像も同じimage方式で送る（PDFベータAPIはトークン消費が大きいため）
     var imgMediaType = window.docFileMime || (docFileType === 'pdf' ? 'application/pdf' : 'image/jpeg');
     var contentBlock;
     if (docFileType === 'pdf') {
       contentBlock = { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: docFileData } };
     } else {
-      // 画像の場合はファイルのmimeタイプを正確に
       contentBlock = { type: 'image', source: { type: 'base64', media_type: imgMediaType, data: docFileData } };
     }
+    console.log('[analyzeDocument] contentBlockタイプ=', contentBlock.type, 'mediaType=', contentBlock.source.media_type);
 
     var response = await fetch('/.netlify/functions/claude', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: CLAUDE_MODEL,
-        max_tokens: 600,
+        max_tokens: 1500,
         usePdfBeta: docFileType === 'pdf',
         messages: [{
           role: 'user',
@@ -2431,66 +2432,82 @@ async function analyzeDocument() {
             contentBlock,
             {
               type: 'text',
-              text: '訪問看護指示書の画像から患者情報をJSONで抽出。JSON形式のみで回答。\n【重要な読み取りルール】\n・主たる傷病名は複数ある場合（最大3つ）すべて読み取りカンマ区切りで記載\n・要介護状態区分は○がついている項目を正確に読む（要支援1/要支援2/要介護1/要介護2/要介護3/要介護4/要介護5）\n・障害高齢者の日常生活自立度は□の中に✓またはレ点がある項目（自立/J1/J2/A1/A2/B1/B2/C1/C2）\n・認知症高齢者の日常生活自立度は□の中に✓またはレ点がある項目（自立/Ⅰ/Ⅱa/Ⅱb/Ⅲa/Ⅲb/Ⅳ/M）\n・内服薬は全て1行1薬で薬名・用量・用法を記載\n・医療処置は内服薬を除く処置のみ（点滴・吸引・褥瘡処置・カテーテル等）\n\n{"name":"患者氏名","age":"年齢(数字のみ)","gender":"男性or女性","diagnosis":"主たる傷病名(複数の場合カンマ区切りで全て)","history":"既往歴","procedures":"医療処置(内服薬除く)","adl":"ADL状況","notes":"留意事項・特記事項","medicines":"内服薬全リスト(1行1薬:薬名 用量 用法)","care_level":"要介護度","independence_level":"障害高齢者自立度","dementia_level":"認知症自立度"}。不明は空文字。'
+              text: '訪問看護指示書の画像から患者情報をJSONで抽出。JSON形式のみで回答。\n【重要な読み取りルール】\n・主たる傷病名は複数ある場合（最大3つ）すべて読み取りカンマ区切りで記載\n・要介護状態区分は○がついている項目を正確に読む（要支援1/要支援2/要介護1/要介護2/要介護3/要介護4/要介護5）\n・障害高齢者の日常生活自立度は□の中に✓またはレ点がある項目（自立/J1/J2/A1/A2/B1/B2/C1/C2）\n・認知症高齢者の日常生活自立度は□の中に✓またはレ点がある項目（自立/Ⅰ/Ⅱa/Ⅱb/Ⅲa/Ⅲb/Ⅳ/M）\n・内服薬は全て1行1薬で薬名・用量・用法を記載\n・医療処置は内服薬を除く処置のみ（点滴・吸引・褥瘡処置・カテーテル等）\n\n{"name":"患者氏名","age":"年齢(数字のみ)","gender":"男性or女性","diagnosis":"主たる傷病名(複数の場合カンマ区切りで全て)","history":"既往歴","procedures":"医療処置(内服薬除く)","adl":"ADL状況","notes":"留意事項・特記事項","medicines":"内服薬全リスト(1行1薬:薬名 用量 用法。複数の場合は\\nで区切る)","care_level":"要介護度","independence_level":"障害高齢者自立度","dementia_level":"認知症自立度"}。不明は空文字。'
             }
           ]
         }]
       })
     });
 
+    console.log('[analyzeDocument] APIレスポンス status=', response.status);
     var data = await response.json();
 
     // APIエラーチェック
     if (!response.ok || data.error) {
       var errMsg = data.error?.message || '';
+      console.error('[analyzeDocument] APIエラー:', errMsg || response.status, data);
       if (errMsg.includes('rate limit') || errMsg.includes('tokens per minute')) {
         throw new Error('アクセスが集中しています。少し待ってから再度お試しください（1分後）');
       }
       throw new Error('APIエラー: ' + (errMsg || response.status));
     }
     if (!data.content || !data.content[0] || !data.content[0].text) {
+      console.error('[analyzeDocument] レスポンスにcontentなし:', data);
       throw new Error('AIからの応答が空です。PDFが複数ページある場合は、1〜2ページ目だけのPDFにしてから再度お試しください。');
     }
 
     var result = data.content[0].text;
-    var parsed = null;
+    console.log('[analyzeDocument] AIレスポンス raw:', result);
 
-    // まずJSONとして解析を試みる
+    var parsed = null;
     var cleanResult = result.replace(/```json|```/g, '').trim();
-    // JSONブロックを探す
     var jsonMatch = cleanResult.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
-      try { parsed = JSON.parse(jsonMatch[0]); } catch(e) {
-        console.error('[analyzeDocument] JSONパース失敗:', e, '\n対象文字列:', jsonMatch[0]);
+      try {
+        parsed = JSON.parse(jsonMatch[0]);
+        console.log('[analyzeDocument] JSONパース成功:', parsed);
+      } catch(e) {
+        console.error('[analyzeDocument] JSONパース失敗:', e, '\n対象:', jsonMatch[0]);
       }
+    } else {
+      console.error('[analyzeDocument] JSONブロックが見つかりません。レスポンス:', result);
     }
 
-    // JSON解析失敗時はエラーを表示（notesには書き込まない）
     if (!parsed) {
-      console.error('[analyzeDocument] 有効なJSONを取得できませんでした。AIレスポンス:', result);
       showStatus('⚠️ 書類の自動入力に失敗しました。画像を確認して再度お試しください。', 6000);
       docFileData = null;
       return;
     }
 
-    // フォームに自動入力
-    if (parsed.name) document.getElementById('reg-name').value = parsed.name;
-    if (parsed.age) document.getElementById('reg-age').value = String(parsed.age).replace(/[^0-9]/g, '');
-    if (parsed.gender) document.getElementById('reg-gender').value = parsed.gender;
-    if (parsed.diagnosis) document.getElementById('reg-diagnosis').value = parsed.diagnosis;
-    if (parsed.history) document.getElementById('reg-history').value = parsed.history;
+    // フォームに自動入力（フィールドID確認済み）
+    if (parsed.name)    document.getElementById('reg-name').value = parsed.name;
+    if (parsed.age)     document.getElementById('reg-age').value = String(parsed.age).replace(/[^0-9]/g, '');
+    if (parsed.gender)  document.getElementById('reg-gender').value = parsed.gender;
+    if (parsed.diagnosis)  document.getElementById('reg-diagnosis').value = parsed.diagnosis;
+    if (parsed.history)    document.getElementById('reg-history').value = parsed.history;
     if (parsed.procedures) document.getElementById('reg-procedures').value = parsed.procedures;
-    if (parsed.adl) document.getElementById('reg-adl').value = parsed.adl;
-    if (parsed.notes) document.getElementById('reg-notes').value = parsed.notes;
+    if (parsed.adl)    document.getElementById('reg-adl').value = parsed.adl;
+    if (parsed.notes)  document.getElementById('reg-notes').value = parsed.notes;
     if (parsed.medicines) renderMedicineRows('reg-medicines-rows', parsed.medicines);
-    if (parsed.care_level) { var cl = document.getElementById('reg-care-level'); if(cl) cl.value = parsed.care_level; }
-    if (parsed.independence_level) { var il = document.getElementById('reg-independence'); if(il) il.value = parsed.independence_level; }
-    if (parsed.dementia_level) { var dl = document.getElementById('reg-dementia-level'); if(dl) dl.value = parsed.dementia_level; }
+    if (parsed.care_level) {
+      var cl = document.getElementById('reg-care-level');
+      if (cl) cl.value = parsed.care_level;
+    }
+    if (parsed.independence_level) {
+      var il = document.getElementById('reg-independence');
+      if (il) il.value = parsed.independence_level;
+    }
+    if (parsed.dementia_level) {
+      var dl = document.getElementById('reg-dementia-level');
+      if (dl) dl.value = parsed.dementia_level;
+    }
 
+    console.log('[analyzeDocument] フォームセット完了');
     showStatus('✅ 書類から患者情報を読み取りました！内容を確認してください');
     docFileData = null;
 
   } catch(e) {
+    console.error('[analyzeDocument] エラー:', e);
     showStatus('⚠️ 読み取りに失敗しました: ' + e.message, 5000);
   } finally {
     document.getElementById('doc-reading-status').style.display = 'none';
