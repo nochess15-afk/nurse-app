@@ -6,6 +6,7 @@ const CLAUDE_MODEL_FAST = 'claude-haiku-4-5-20251001';
 
 let currentPatient = null;
 let observations = [];
+const suspiciousPatients = new Set(); // 薬剤要確認フラグ（メモリ管理・リロードでリセット）
 
 // ===== ユーティリティ =====
 function showStatus(msg, duration = 3000) {
@@ -637,7 +638,7 @@ function renderPatientList(patients) {
       return;
     }
     container.innerHTML = '<div class="patient-list">' + patients.map(function(p) {
-      var hasDrugWarning = p.notes && p.notes.includes('⚠️薬剤要確認');
+      var hasDrugWarning = suspiciousPatients.has(p.id);
       return '<div class="patient-item fade-in" style="position:relative">' +
         '<div style="flex:1;display:flex;align-items:center;gap:10px;cursor:pointer" data-id="' + p.id + '" onclick="selectPatientById(this)">' +
         '<div class="patient-info">' +
@@ -1314,13 +1315,9 @@ async function savePatient() {
         var drugCheckResult = JSON.parse(jsonStr);
         console.log('[savePatient] 薬剤チェック結果', drugCheckResult);
 
-        // ④ suspicious: true なら notes を更新してモーダル表示
+        // ④ suspicious: true ならメモリフラグを立ててモーダル表示（notes は汚染しない）
         if (drugCheckResult.suspicious) {
-          var updatedNotes = '⚠️薬剤要確認\n' + (notes || '');
-          if (savedId) {
-            await supabaseFetch('patients?id=eq.' + savedId, 'PATCH', { notes: updatedNotes });
-            console.log('[savePatient] notesにフラグを追記しました');
-          }
+          if (savedId) suspiciousPatients.add(savedId);
           if (drugCheckResult.names && drugCheckResult.names.length) {
             var ul = document.getElementById('drug-check-names');
             ul.innerHTML = drugCheckResult.names.map(function(n) { return '<li>・' + n + '</li>'; }).join('');
@@ -1789,7 +1786,7 @@ function proceedAssessmentAnyway() {
 async function generateAssessment() {
   if (!currentPatient) { showStatus('⚠️ 患者を選択してください'); return; }
 
-  if (currentPatient.notes && currentPatient.notes.includes('⚠️薬剤要確認')) {
+  if (suspiciousPatients.has(currentPatient.id)) {
     _pendingAssessmentEvent = event;
     document.getElementById('assessment-drug-modal').style.display = 'flex';
     // 推奨ボタンにフォーカス
