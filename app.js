@@ -2460,14 +2460,15 @@ async function analyzeDocument() {
     // JSONブロックを探す
     var jsonMatch = cleanResult.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
-      try { parsed = JSON.parse(jsonMatch[0]); } catch(e) {}
+      try { parsed = JSON.parse(jsonMatch[0]); } catch(e) {
+        console.error('[analyzeDocument] JSONパース失敗:', e, '\n対象文字列:', jsonMatch[0]);
+      }
     }
 
-    // JSON解析失敗時はAIに再度テキスト形式で問い合わせ
+    // JSON解析失敗時はエラーを表示（notesには書き込まない）
     if (!parsed) {
-      // テキストから直接フォームに貼り付け
-      document.getElementById('reg-notes').value = result;
-      showStatus('⚠️ 自動入力できませんでした。「特記事項」欄に読み取り結果を貼り付けました。手動で各項目にコピーしてください。', 6000);
+      console.error('[analyzeDocument] 有効なJSONを取得できませんでした。AIレスポンス:', result);
+      showStatus('⚠️ 書類の自動入力に失敗しました。画像を確認して再度お試しください。', 6000);
       docFileData = null;
       return;
     }
@@ -2509,7 +2510,9 @@ async function checkLogin() {
       updateStaffBadge();
       return;
     }
-  } catch(e) {}
+  } catch(e) {
+    console.error('[checkLogin] ログイン情報の読み込み失敗:', e);
+  }
   // ログイン画面を表示
   document.getElementById('login-screen').style.display = 'flex';
 }
@@ -2679,7 +2682,7 @@ async function loadAdminPanel() {
     var pats = await supabaseFetch('patients?select=id');
     var vis = await supabaseFetch('visits?select=id');
     document.getElementById('admin-stats').innerHTML = '患者数：<strong>' + pats.length + '名</strong>　訪問記録数：<strong>' + vis.length + '件</strong>';
-  } catch(e) {}
+  } catch(e) { console.warn('[loadAdminPanel] 統計取得失敗:', e); }
 }
 
 function deleteStaffBtn(btn) {
