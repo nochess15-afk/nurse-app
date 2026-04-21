@@ -1086,6 +1086,32 @@ function removeMedicineRow(btn, containerId) {
   reindexMedicineRows(containerId);
 }
 
+// 薬剤行を⚠️付きでレンダリング（疑わしい行は赤ボーダー＋インライン編集）
+function renderMedicineRowsWithWarnings(containerId, medicines, suspiciousNames) {
+  var container = document.getElementById(containerId);
+  if (!container) return;
+  var list = parseMedicinesList(medicines || '');
+  var susLower = (suspiciousNames || []).map(function(s) { return s.toLowerCase(); });
+  container.innerHTML = list.map(function(med, i) {
+    var val = med.replace(/^\d+\.\s*/, '');
+    var isSuspicious = susLower.some(function(s) {
+      return val.toLowerCase().includes(s) || s.includes(val.toLowerCase());
+    });
+    var rowStyle = 'display:flex;align-items:center;gap:6px;margin-bottom:4px';
+    var inputStyle = 'flex:1;font-size:12px;padding:5px 8px;border-radius:6px;border:' +
+      (isSuspicious ? '1.5px solid #dc2626;background:#fff5f5' : '1px solid var(--border)');
+    var prefix = isSuspicious
+      ? '<span title="実在しない薬剤名の可能性あり" style="color:#dc2626;font-size:14px;flex-shrink:0;cursor:default">⚠️</span>'
+      : '<span style="color:var(--primary);font-weight:700;min-width:20px;font-size:13px;flex-shrink:0">' + (i+1) + '.</span>';
+    return '<div style="' + rowStyle + '" class="med-row">' +
+      prefix +
+      '<input type="text" value="' + escHtml(val) + '" placeholder="薬剤名 用量 用法" style="' + inputStyle + '">' +
+      '<button type="button" onclick="removeMedicineRow(this,\'' + containerId + '\')" ' +
+      'style="background:none;border:none;color:#ef4444;font-size:18px;line-height:1;cursor:pointer;padding:0 4px;flex-shrink:0">×</button>' +
+      '</div>';
+  }).join('');
+}
+
 // 行から内服薬文字列を取得（改行結合）
 function getMedicinesFromRows(containerId) {
   var container = document.getElementById(containerId);
@@ -1372,9 +1398,32 @@ async function analyzeMedicinePhoto() {
     var data = await response.json();
     var result = data.content[0].text;
 
+    // 既存行と結合
     var current = getMedicinesFromRows('reg-medicines-rows');
-    renderMedicineRows('reg-medicines-rows', current ? current + '\n' + result : result);
-    showStatus('✅ お薬手帳を読み取りました！内容を確認してください');
+    var combined = current ? current + '\n' + result : result;
+
+    // 薬剤チェック（後処理・失敗しても表示はする）
+    btn.innerHTML = '<span class="loading-dot"><span></span><span></span><span></span></span> 薬剤名を確認中...';
+    var suspiciousNames = [];
+    try {
+      var checkRaw = await callClaude(
+        'あなたは薬剤名の検証AIです。JSONのみで返答してください。前置き・説明・マークダウン不要。',
+        '以下の薬剤リストに、日本で実在しない・読み取りエラーと思われる薬剤名が含まれていますか？\n' + combined + '\n返答形式：{"suspicious": true/false, "names": ["疑わしい薬剤名1", ...]}'
+      );
+      var checkJson = checkRaw.trim().replace(/^```[a-z]*\n?/, '').replace(/\n?```$/, '');
+      var checkResult = JSON.parse(checkJson);
+      if (checkResult.suspicious && checkResult.names) suspiciousNames = checkResult.names;
+    } catch(e) {
+      // チェック失敗は無視して表示続行
+    }
+
+    renderMedicineRowsWithWarnings('reg-medicines-rows', combined, suspiciousNames);
+
+    if (suspiciousNames.length) {
+      showStatus('⚠️ 読み取り完了。疑わしい薬剤名があります（赤枠の行を確認してください）', 6000);
+    } else {
+      showStatus('✅ お薬手帳を読み取りました！内容を確認してください');
+    }
     document.getElementById('medicine-preview').style.display = 'none';
     document.getElementById('medicine-photo-name').textContent = 'ファイル未選択';
 
