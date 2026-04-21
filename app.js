@@ -6,7 +6,7 @@ const CLAUDE_MODEL_FAST = 'claude-haiku-4-5-20251001';
 
 let currentPatient = null;
 let observations = [];
-const suspiciousPatients = new Set(); // 薬剤要確認フラグ（メモリ管理・リロードでリセット）
+
 
 // ===== ユーティリティ =====
 function showStatus(msg, duration = 3000) {
@@ -638,11 +638,10 @@ function renderPatientList(patients) {
       return;
     }
     container.innerHTML = '<div class="patient-list">' + patients.map(function(p) {
-      var hasDrugWarning = suspiciousPatients.has(p.id);
       return '<div class="patient-item fade-in" style="position:relative">' +
         '<div style="flex:1;display:flex;align-items:center;gap:10px;cursor:pointer" data-id="' + p.id + '" onclick="selectPatientById(this)">' +
         '<div class="patient-info">' +
-        '<h3 style="display:flex;align-items:center;gap:6px">' + p.name + (hasDrugWarning ? '<span style="background:#dc2626;color:white;font-size:11px;padding:2px 6px;border-radius:4px;margin-left:6px;">⚠️薬剤</span>' : '') + '</h3>' +
+        '<h3>' + p.name + '</h3>' +
         '<p>' + (p.age ? p.age + '歳・' : '') + (p.gender || '') + (p.main_diagnosis ? '・' + p.main_diagnosis : '') + (p.nurse ? ' 担当：' + p.nurse : '') + '</p>' +
         '</div>' +
         '<span style="color:var(--text-light);font-size:20px">›</span>' +
@@ -1302,43 +1301,12 @@ async function savePatient() {
     document.getElementById('obs-card').style.display = 'none';
     loadPatients();
     switchTab('patients');
-    console.log('[savePatient] ③ UI更新完了');
-
-    // ④ 薬剤チェックをfire-and-forget（awaitなし・savePatientをブロックしない）
-    if (medicines && savedId) {
-      checkMedicinesAsync(savedId, medicines);
-    }
 
   } catch(e) {
-    console.error('[savePatient] 登録エラー:', e);
     showStatus('⚠️ 保存に失敗しました: ' + e.message, 5000);
   } finally {
     btn.disabled = false;
     btn.innerHTML = '💾 この患者を保存する';
-  }
-}
-
-// 薬剤チェック（savePatientから完全分離・fire-and-forget用）
-async function checkMedicinesAsync(patientId, medicines) {
-  try {
-    console.log('[checkMedicinesAsync] 薬剤チェック開始 patientId=', patientId);
-    var rawJson = await callClaude(
-      'あなたは薬剤名の検証AIです。JSONのみで返答してください。前置き・説明・マークダウン不要。',
-      '以下の薬剤リストに、日本で実在しない・読み取りエラーと思われる薬剤名が含まれていますか？\n' + medicines + '\n返答形式：{"suspicious": true/false, "names": ["疑わしい薬剤名1", ...]}'
-    );
-    var jsonStr = rawJson.trim().replace(/^```[a-z]*\n?/, '').replace(/\n?```$/, '');
-    var result = JSON.parse(jsonStr);
-    console.log('[checkMedicinesAsync] チェック結果:', result);
-    if (result.suspicious) {
-      suspiciousPatients.add(patientId);
-      if (result.names && result.names.length) {
-        var ul = document.getElementById('drug-check-names');
-        ul.innerHTML = result.names.map(function(n) { return '<li>・' + n + '</li>'; }).join('');
-        document.getElementById('drug-check-modal').style.display = 'flex';
-      }
-    }
-  } catch(e) {
-    console.error('[checkMedicinesAsync] 薬剤チェック失敗（登録には影響なし）:', e);
   }
 }
 
@@ -1776,34 +1744,10 @@ async function deleteVisit(id, visitDate) {
 }
 
 // ===== AIアセスメント =====
-var _pendingAssessmentEvent = null;
-
-function proceedAssessmentAnyway() {
-  document.getElementById('assessment-drug-modal').style.display = 'none';
-  if (_pendingAssessmentEvent) {
-    _doGenerateAssessment(_pendingAssessmentEvent);
-    _pendingAssessmentEvent = null;
-  }
-}
-
 async function generateAssessment() {
   if (!currentPatient) { showStatus('⚠️ 患者を選択してください'); return; }
 
-  if (suspiciousPatients.has(currentPatient.id)) {
-    _pendingAssessmentEvent = event;
-    document.getElementById('assessment-drug-modal').style.display = 'flex';
-    // 推奨ボタンにフォーカス
-    setTimeout(function() {
-      var recBtn = document.querySelector('#assessment-drug-modal button[autofocus]');
-      if (recBtn) recBtn.focus();
-    }, 50);
-    return;
-  }
-  _doGenerateAssessment(event);
-}
-
-async function _doGenerateAssessment(evt) {
-  const btn = evt.target;
+  const btn = event.target;
   btn.disabled = true;
   btn.innerHTML = '<span class="loading-dot"><span></span><span></span><span></span></span> AIが分析中...';
 
