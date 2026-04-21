@@ -1223,39 +1223,17 @@ async function savePatient() {
   btn.innerHTML = '💾 保存中...';
 
   try {
+    // ① フォームデータ収集
     const medicines = getMedicinesFromRows('reg-medicines-rows');
     const nurse = document.getElementById('reg-nurse') ? document.getElementById('reg-nurse').value.trim() : '';
     const livingSituation = document.getElementById('reg-living-situation') ? document.getElementById('reg-living-situation').value.trim() : '';
     const keyPerson = document.getElementById('reg-key-person') ? document.getElementById('reg-key-person').value.trim() : '';
     const emergencyContact = document.getElementById('reg-emergency-contact') ? document.getElementById('reg-emergency-contact').value.trim() : '';
     const caregiverNotes = document.getElementById('reg-caregiver-notes') ? document.getElementById('reg-caregiver-notes').value.trim() : '';
-    // 観察項目を収集
     var allObsItems = COMMON_ITEMS.slice();
     var diseaseObsResult = getDiseaseItems(diagnosis);
     if (diseaseObsResult) allObsItems = allObsItems.concat(diseaseObsResult.items);
     if (observations && observations.length) allObsItems = allObsItems.concat(observations);
-
-    // 薬剤名安全チェック
-    var finalNotes = notes || null;
-    var drugCheckResult = null;
-    if (medicines) {
-      btn.innerHTML = '<span class="loading-dot"><span></span><span></span><span></span></span> 薬剤名を確認中...';
-      try {
-        var rawJson = await callClaude(
-          'あなたは薬剤名の検証AIです。JSONのみで返答してください。前置き・説明・マークダウン不要。',
-          '以下の薬剤リストに、日本で実在しない・読み取りエラーと思われる薬剤名が含まれていますか？\n' + medicines + '\n返答形式：{"suspicious": true/false, "names": ["疑わしい薬剤名1", ...]}'
-        );
-        var jsonStr = rawJson.trim().replace(/^```[a-z]*\n?/,'').replace(/\n?```$/,'');
-        drugCheckResult = JSON.parse(jsonStr);
-      } catch(e) {
-        // チェック失敗は無視して登録続行
-        drugCheckResult = null;
-      }
-    }
-
-    if (drugCheckResult && drugCheckResult.suspicious) {
-      finalNotes = '⚠️薬剤要確認\n' + (notes || '');
-    }
 
     const patientPayload = {
       name, age: age ? parseInt(age) : null,
@@ -1265,7 +1243,7 @@ async function savePatient() {
       medical_history: history || null,
       medical_procedures: procedures || null,
       adl: adl || null,
-      notes: finalNotes,
+      notes: notes || null,
       medicines: medicines || null,
       observation_items: allObsItems.length ? allObsItems.join('\n') : null,
       living_situation: livingSituation || null,
@@ -1273,28 +1251,64 @@ async function savePatient() {
       emergency_contact: emergencyContact || null,
       caregiver_notes: caregiverNotes || null
     };
+
+    // ② Supabaseへ登録（最優先・薬剤チェックと完全に切り離し）
+    console.log('[savePatient] Supabase登録開始', patientPayload);
+    var savedId = null;
     if (window.editingPatientId) {
       await supabaseFetch('patients?id=eq.' + window.editingPatientId, 'PATCH', patientPayload);
+      savedId = window.editingPatientId;
       window.editingPatientId = null;
       var saveBtn = document.querySelector('button[onclick="savePatient()"]');
       if (saveBtn) { saveBtn.innerHTML = '💾 この患者を保存する'; saveBtn.style.background = ''; }
     } else {
-      await supabaseFetch('patients', 'POST', patientPayload);
+      var inserted = await supabaseFetch('patients', 'POST', patientPayload);
+      savedId = inserted && inserted[0] ? inserted[0].id : null;
     }
+    console.log('[savePatient] Supabase登録完了 id=', savedId);
 
+    // 登録完了を先にUIへ反映
     showStatus('✅ 患者情報を保存しました');
     clearRegForm();
     document.getElementById('obs-card').style.display = 'none';
     loadPatients();
     switchTab('patients');
 
-    if (drugCheckResult && drugCheckResult.suspicious && drugCheckResult.names && drugCheckResult.names.length) {
-      var ul = document.getElementById('drug-check-names');
-      ul.innerHTML = drugCheckResult.names.map(function(n) { return '<li>・' + n + '</li>'; }).join('');
-      document.getElementById('drug-check-modal').style.display = 'flex';
+    // ③ 薬剤チェック（後処理・失敗しても登録に影響しない）
+    if (medicines) {
+      console.log('[savePatient] 薬剤チェック開始');
+      btn.innerHTML = '<span class="loading-dot"><span></span><span></span><span></span></span> 薬剤名を確認中...';
+      btn.disabled = true;
+      try {
+        var rawJson = await callClaude(
+          'あなたは薬剤名の検証AIです。JSONのみで返答してください。前置き・説明・マークダウン不要。',
+          '以下の薬剤リストに、日本で実在しない・読み取りエラーと思われる薬剤名が含まれていますか？\n' + medicines + '\n返答形式：{"suspicious": true/false, "names": ["疑わしい薬剤名1", ...]}'
+        );
+        var jsonStr = rawJson.trim().replace(/^```[a-z]*\n?/, '').replace(/\n?```$/, '');
+        var drugCheckResult = JSON.parse(jsonStr);
+        console.log('[savePatient] 薬剤チェック結果', drugCheckResult);
+
+        // ④ suspicious: true なら notes を更新してモーダル表示
+        if (drugCheckResult.suspicious) {
+          var updatedNotes = '⚠️薬剤要確認\n' + (notes || '');
+          if (savedId) {
+            await supabaseFetch('patients?id=eq.' + savedId, 'PATCH', { notes: updatedNotes });
+            console.log('[savePatient] notesにフラグを追記しました');
+          }
+          if (drugCheckResult.names && drugCheckResult.names.length) {
+            var ul = document.getElementById('drug-check-names');
+            ul.innerHTML = drugCheckResult.names.map(function(n) { return '<li>・' + n + '</li>'; }).join('');
+            document.getElementById('drug-check-modal').style.display = 'flex';
+          }
+        }
+      } catch(drugErr) {
+        // 薬剤チェック失敗は無視（登録は既に完了）
+        console.warn('[savePatient] 薬剤チェック失敗（無視）', drugErr);
+      }
     }
 
   } catch(e) {
+    console.error('[savePatient] 登録エラー', e);
     showStatus('⚠️ 保存に失敗しました: ' + e.message, 5000);
   } finally {
     btn.disabled = false;
