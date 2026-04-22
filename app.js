@@ -2424,10 +2424,9 @@ function readDocumentFile(input) {
     return;
   }
 
-  // JPEG/PNG/WebP/GIF のみ対応
-  var supported = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-  if (file.type && !supported.includes(file.type)) {
-    showStatus('⚠️ 非対応の画像形式です。JPEG・PNG形式でお試しください。', 6000);
+  // image/* を許可（HEICなど非対応形式はanalyzeDocument内でjpegにフォールバック）
+  if (file.type && !file.type.startsWith('image/')) {
+    showStatus('⚠️ 画像ファイルを選択してください。', 5000);
     input.value = '';
     return;
   }
@@ -2455,17 +2454,25 @@ function readDocumentFile(input) {
 }
 
 async function analyzeDocument() {
+  console.log('[analyzeDocument] 呼び出し docFileData=', docFileData ? '有り(' + docFileData.length + 'chars)' : 'null');
   if (!docFileData) { showStatus('⚠️ ファイルを選択してください'); return; }
 
-  console.log('[analyzeDocument] 開始 docFileType=', docFileType, 'データ長=', docFileData ? docFileData.length : 0);
+  console.log('[analyzeDocument] 開始 docFileMimeType=', docFileMimeType, 'データ長=', docFileData.length);
 
   document.getElementById('doc-reading-status').style.display = '';
   document.getElementById('doc-preview').style.display = 'none';
 
   try {
     var mediaType = docFileMimeType || 'image/jpeg';
+    // Claude API対応形式に正規化（HEICなど非対応はjpegで送信）
+    var supported = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!supported.includes(mediaType)) {
+      console.warn('[analyzeDocument] 非対応MIME型:', mediaType, '→ image/jpeg に変換');
+      mediaType = 'image/jpeg';
+    }
     var contentBlock = { type: 'image', source: { type: 'base64', media_type: mediaType, data: docFileData } };
     console.log('[analyzeDocument] 画像送信 media_type=', mediaType, 'base64長=', docFileData.length);
+    console.log('[analyzeDocument] fetchを開始します /.netlify/functions/claude');
 
     var response = await fetch('/.netlify/functions/claude', {
       method: 'POST',
@@ -2549,7 +2556,7 @@ async function analyzeDocument() {
     window._docParsed = parsed;
     window._docNormalizedMedicines = normalizedMedicines;
     document.getElementById('doc-confirm-name').value = parsed.name || '';
-    document.getElementById('doc-confirm-diagnosis').value = parsed.diagnosis || '';
+    document.getElementById('doc-confirm-diagnosis').value = parsed.diagnosis1 || '';
     document.getElementById('doc-confirm-age').value = String(parsed.age || '').replace(/[^0-9]/g, '');
     document.getElementById('doc-confirm-modal').style.display = 'flex';
     docFileData = null;

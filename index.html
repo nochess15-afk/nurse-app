@@ -301,7 +301,7 @@
             📷 写真を撮影・選択
           </button>
         </div>
-        <input type="file" id="doc-photo" accept="image/jpeg,image/png,image/webp,image/gif" style="display:none" onchange="readDocumentFile(this)">
+        <input type="file" id="doc-photo" accept="image/*" style="display:none" onchange="readDocumentFile(this)">
         <div id="doc-preview" style="display:none;margin-top:10px">
           <img id="doc-img" style="max-width:100%;max-height:200px;border-radius:6px;border:1px solid var(--border)">
           <div id="doc-filename" style="font-size:12px;color:var(--text-secondary);margin-top:6px"></div>
