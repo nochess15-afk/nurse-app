@@ -66,6 +66,23 @@ exports.handler = async function(event, context) {
       apiHeaders['anthropic-beta'] = 'pdfs-2024-09-25';
     }
 
+    // DEBUG: サーバー側リクエスト内容ログ
+    const msgs = body.messages || [];
+    const firstContent = msgs[0] && msgs[0].content ? msgs[0].content : [];
+    console.log('[DEBUG claude.js] model:', body.model);
+    console.log('[DEBUG claude.js] max_tokens:', body.max_tokens);
+    console.log('[DEBUG claude.js] usePdfBeta:', body.usePdfBeta);
+    console.log('[DEBUG claude.js] anthropic-beta header:', apiHeaders['anthropic-beta'] || 'なし');
+    console.log('[DEBUG claude.js] messages[0].content blocks数:', firstContent.length);
+    firstContent.forEach(function(block, i) {
+      if (block.source) {
+        console.log('[DEBUG claude.js] content[' + i + '] type=' + block.type + ' media_type=' + block.source.media_type + ' data_length=' + (block.source.data ? block.source.data.length : 0));
+      } else {
+        console.log('[DEBUG claude.js] content[' + i + '] type=' + block.type + ' (text block)');
+      }
+    });
+    console.log('[DEBUG claude.js] event.body byteLength:', Buffer.byteLength(event.body), 'bytes (約', Math.round(Buffer.byteLength(event.body) / 1024), 'KB)');
+
     const result = await httpsPost(
       'https://api.anthropic.com/v1/messages',
       apiHeaders,
@@ -76,6 +93,7 @@ exports.handler = async function(event, context) {
         messages: body.messages
       }
     );
+    console.log('[DEBUG claude.js] API response status:', result.status);
 
     return {
       statusCode: result.status,

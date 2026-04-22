@@ -2471,6 +2471,29 @@ async function analyzeDocument() {
     }
     console.log('[analyzeDocument] contentBlockタイプ=', contentBlock.type, 'mediaType=', contentBlock.source.media_type);
 
+    // DEBUG: APIリクエスト内容の詳細ログ
+    var debugRequestBody = {
+      model: CLAUDE_MODEL,
+      max_tokens: 1500,
+      usePdfBeta: docFileType === 'pdf',
+      messages_structure: {
+        role: 'user',
+        content_blocks: [
+          { type: contentBlock.type, media_type: contentBlock.source.media_type, data_length: contentBlock.source.data.length }
+        ]
+      }
+    };
+    console.log('[DEBUG] === APIリクエスト詳細 ===');
+    console.log('[DEBUG] model:', CLAUDE_MODEL);
+    console.log('[DEBUG] max_tokens:', 1500);
+    console.log('[DEBUG] usePdfBeta:', docFileType === 'pdf');
+    console.log('[DEBUG] contentBlock.type:', contentBlock.type);
+    console.log('[DEBUG] contentBlock.source.media_type:', contentBlock.source.media_type);
+    console.log('[DEBUG] base64データ長:', docFileData.length, 'chars (約', Math.round(docFileData.length * 3 / 4 / 1024), 'KB)');
+    console.log('[DEBUG] JSONボディ全体サイズ概算:', Math.round(JSON.stringify(debugRequestBody).length / 1024), 'KB (base64含む実サイズは別途)');
+    console.log('[DEBUG] messages構造:', JSON.stringify(debugRequestBody.messages_structure));
+    console.log('[DEBUG] === ここまで ===');
+
     var response = await fetch('/.netlify/functions/claude', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
