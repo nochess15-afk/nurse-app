@@ -1238,6 +1238,30 @@
   </div>
 </div>
 
+<div id="doc-confirm-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:2100;align-items:center;justify-content:center;padding:20px">
+  <div style="background:white;border-radius:var(--radius);max-width:420px;width:100%;box-shadow:var(--shadow-lg);overflow:hidden">
+    <div style="background:var(--primary);color:white;padding:14px 18px;display:flex;align-items:center;gap:10px">
+      <span style="font-size:18px">📋</span>
+      <span style="font-weight:700;font-size:15px">指示書の読み取り結果</span>
+    </div>
+    <div style="padding:18px">
+      <p style="font-size:13px;color:#b45309;background:#fef3c7;border-radius:6px;padding:8px 12px;margin-bottom:16px">⚠️ 氏名・病名を確認してください</p>
+      <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:18px">
+        <label style="font-size:13px;font-weight:600;color:var(--text)">氏名
+          <input id="doc-confirm-name" type="text" style="display:block;width:100%;margin-top:4px;padding:8px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:14px;box-sizing:border-box">
+        </label>
+        <label style="font-size:13px;font-weight:600;color:var(--text)">主たる傷病名
+          <input id="doc-confirm-diagnosis" type="text" style="display:block;width:100%;margin-top:4px;padding:8px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:14px;box-sizing:border-box">
+        </label>
+        <label style="font-size:13px;font-weight:600;color:var(--text)">年齢
+          <input id="doc-confirm-age" type="number" style="display:block;width:100%;margin-top:4px;padding:8px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:14px;box-sizing:border-box">
+        </label>
+      </div>
+      <button class="btn btn-primary btn-full" onclick="confirmDocForm()">確認OK・登録する</button>
+    </div>
+  </div>
+</div>
+
 <script src="app.js"></script>
 </body>
 </html>

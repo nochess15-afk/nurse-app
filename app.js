@@ -2448,13 +2448,14 @@ async function analyzeDocument() {
         model: CLAUDE_MODEL,
         max_tokens: 1500,
         usePdfBeta: docFileType === 'pdf',
+        system: 'あなたは訪問看護指示書の読み取り専門AIです。JSONのみで返答してください。前置き・説明・マークダウン不要。',
         messages: [{
           role: 'user',
           content: [
             contentBlock,
             {
               type: 'text',
-              text: '訪問看護指示書の画像から患者情報をJSONで抽出。JSON形式のみで回答。\n\n【絶対ルール：空欄・未記載の扱い】\n・各フィールドは指示書に実際に記載されている内容のみを抽出すること\n・空欄・該当なし・記載なしの場合は必ず空文字列("")を返すこと\n・存在しない情報を推測・補完・生成しないこと\n\n【フィールドの抽出元】\n・name：患者氏名欄\n・age：年齢欄（数字のみ）\n・gender：性別（男性 or 女性）\n・diagnosis：主たる傷病名（複数ある場合は最大3つをカンマ区切り）\n・history：既往歴欄の記載のみ\n・procedures：「装着・使用医療機器等」欄の記載のみ。空欄なら""\n・adl：ADL状況欄の記載のみ\n・notes：「Ⅰ 療養生活指導上の留意事項」欄の記載のみ。他の欄は含めない\n・medicines：内服薬欄の全リスト（1行1薬：薬名 用量 用法。複数の場合は\\nで区切る）\n・care_level：要介護状態区分（○がついている項目：要支援1/要支援2/要介護1/要介護2/要介護3/要介護4/要介護5）\n・independence_level：障害高齢者の日常生活自立度（□に✓またはレ点がある項目：自立/J1/J2/A1/A2/B1/B2/C1/C2）\n・dementia_level：認知症高齢者の日常生活自立度（□に✓またはレ点がある項目：自立/Ⅰ/Ⅱa/Ⅱb/Ⅲa/Ⅲb/Ⅳ/M）\n\n【除外】Ⅱ（理学療法士・作業療法士・言語聴覚士が行う訪問看護の時間・頻度・内容）はどのフィールドにも含めず完全に無視する\n\n{"name":"","age":"","gender":"","diagnosis":"","history":"","procedures":"","adl":"","notes":"","medicines":"","care_level":"","independence_level":"","dementia_level":""}'
+              text: 'この訪問看護指示書の画像から以下の項目を正確に読み取ってください。\n手書き文字が含まれています。各フィールドの枠・ラベルを手がかりに正確に読んでください。\n\n必ず以下のJSON形式のみで返答してください：\n{\n  "name": "患者氏名（ふりがなではなく漢字氏名）",\n  "age": "年齢（数字のみ）",\n  "gender": "男性 or 女性",\n  "diagnosis": "主たる傷病名の欄の内容をそのまま",\n  "medicines": "投与中の薬剤（薬剤名・用量・用法を1行1薬剤で、錠・mg・回などの単位を正確に）",\n  "adl": "寝たきり度の該当記号",\n  "rehabilitation": "リハビリテーションの指示内容",\n  "notes": "留意事項・療養生活指導上の留意事項の内容"\n}'
             }
           ]
         }]
@@ -2501,19 +2502,9 @@ async function analyzeDocument() {
       return;
     }
 
-    // フォームに自動入力（フィールドID確認済み）
-    if (parsed.name)    document.getElementById('reg-name').value = parsed.name;
-    if (parsed.age)     document.getElementById('reg-age').value = String(parsed.age).replace(/[^0-9]/g, '');
-    if (parsed.gender)  document.getElementById('reg-gender').value = parsed.gender;
-    if (parsed.diagnosis)  document.getElementById('reg-diagnosis').value = parsed.diagnosis;
-    if (parsed.history)    document.getElementById('reg-history').value = parsed.history;
-    if (parsed.procedures) document.getElementById('reg-procedures').value = parsed.procedures;
-    if (parsed.adl)    document.getElementById('reg-adl').value = parsed.adl;
-    if (parsed.notes)  document.getElementById('reg-notes').value = parsed.notes;
-
     // 薬剤名をAIで正規化（失敗時は元テキストをそのまま使用）
+    var normalizedMedicines = parsed.medicines || '';
     if (parsed.medicines) {
-      var normalizedMedicines = parsed.medicines;
       try {
         var medRaw = await callClaude(
           'あなたは日本の薬剤名の専門家です。OCRで誤認識された薬剤名を正しい日本の薬剤名に修正してください。JSONのみで返答。前置き・マークダウン不要。',
@@ -2526,24 +2517,17 @@ async function analyzeDocument() {
       } catch(e) {
         console.warn('[analyzeDocument] 薬剤名正規化失敗（元テキストを使用）:', e);
       }
-      renderMedicineRows('reg-medicines-rows', normalizedMedicines);
-    }
-    if (parsed.care_level) {
-      var cl = document.getElementById('reg-care-level');
-      if (cl) cl.value = parsed.care_level;
-    }
-    if (parsed.independence_level) {
-      var il = document.getElementById('reg-independence');
-      if (il) il.value = parsed.independence_level;
-    }
-    if (parsed.dementia_level) {
-      var dl = document.getElementById('reg-dementia-level');
-      if (dl) dl.value = parsed.dementia_level;
     }
 
-    console.log('[analyzeDocument] フォームセット完了');
-    showStatus('✅ 書類から患者情報を読み取りました！内容を確認してください');
+    // 確認モーダルに結果を格納して表示
+    window._docParsed = parsed;
+    window._docNormalizedMedicines = normalizedMedicines;
+    document.getElementById('doc-confirm-name').value = parsed.name || '';
+    document.getElementById('doc-confirm-diagnosis').value = parsed.diagnosis || '';
+    document.getElementById('doc-confirm-age').value = String(parsed.age || '').replace(/[^0-9]/g, '');
+    document.getElementById('doc-confirm-modal').style.display = 'flex';
     docFileData = null;
+    showStatus('✅ 書類を読み取りました。氏名・病名を確認してください');
 
   } catch(e) {
     console.error('[analyzeDocument] エラー:', e);
@@ -2554,6 +2538,34 @@ async function analyzeDocument() {
   }
 }
 
+
+function confirmDocForm() {
+  var parsed = window._docParsed || {};
+  var normalizedMedicines = window._docNormalizedMedicines || '';
+  document.getElementById('doc-confirm-modal').style.display = 'none';
+
+  // 確認モーダルで編集された3フィールドを優先
+  var confirmedName = document.getElementById('doc-confirm-name').value.trim();
+  var confirmedDiagnosis = document.getElementById('doc-confirm-diagnosis').value.trim();
+  var confirmedAge = document.getElementById('doc-confirm-age').value.trim();
+
+  if (confirmedName)     document.getElementById('reg-name').value = confirmedName;
+  if (confirmedAge)      document.getElementById('reg-age').value = confirmedAge;
+  if (parsed.gender)     document.getElementById('reg-gender').value = parsed.gender;
+  if (confirmedDiagnosis) document.getElementById('reg-diagnosis').value = confirmedDiagnosis;
+  if (parsed.adl)        document.getElementById('reg-adl').value = parsed.adl;
+  if (parsed.notes)      document.getElementById('reg-notes').value = parsed.notes;
+  if (parsed.rehabilitation) {
+    var hist = document.getElementById('reg-history');
+    if (hist) hist.value = parsed.rehabilitation;
+  }
+  if (normalizedMedicines) {
+    renderMedicineRows('reg-medicines-rows', normalizedMedicines);
+  }
+
+  console.log('[confirmDocForm] フォームセット完了');
+  showStatus('✅ 患者情報を入力しました。内容を確認して保存してください');
+}
 
 // ===== ログイン機能 =====
 var currentStaffInfo = null;
