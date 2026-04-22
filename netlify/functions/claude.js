@@ -76,7 +76,9 @@ exports.handler = async function(event, context) {
     console.log('[DEBUG claude.js] messages[0].content blocks数:', firstContent.length);
     firstContent.forEach(function(block, i) {
       if (block.source) {
+        var data100 = block.source.data ? block.source.data.substring(0, 100) : '(なし)';
         console.log('[DEBUG claude.js] content[' + i + '] type=' + block.type + ' media_type=' + block.source.media_type + ' data_length=' + (block.source.data ? block.source.data.length : 0));
+        console.log('[DEBUG claude.js] content[' + i + '] base64先頭100文字:', data100);
       } else {
         console.log('[DEBUG claude.js] content[' + i + '] type=' + block.type + ' (text block)');
       }
@@ -94,6 +96,7 @@ exports.handler = async function(event, context) {
       }
     );
     console.log('[DEBUG claude.js] API response status:', result.status);
+    console.log('[DEBUG claude.js] APIレスポンス全文:', JSON.stringify(result.body));
 
     return {
       statusCode: result.status,
