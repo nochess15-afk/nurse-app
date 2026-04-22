@@ -62,17 +62,11 @@ exports.handler = async function(event, context) {
       'x-api-key': CLAUDE_KEY,
       'anthropic-version': '2023-06-01'
     };
-    if (body.usePdfBeta) {
-      apiHeaders['anthropic-beta'] = 'pdfs-2024-09-25';
-    }
-
     // DEBUG: サーバー側リクエスト内容ログ
     const msgs = body.messages || [];
     const firstContent = msgs[0] && msgs[0].content ? msgs[0].content : [];
     console.log('[DEBUG claude.js] model:', body.model);
     console.log('[DEBUG claude.js] max_tokens:', body.max_tokens);
-    console.log('[DEBUG claude.js] usePdfBeta:', body.usePdfBeta);
-    console.log('[DEBUG claude.js] anthropic-beta header:', apiHeaders['anthropic-beta'] || 'なし');
     console.log('[DEBUG claude.js] messages[0].content blocks数:', firstContent.length);
     firstContent.forEach(function(block, i) {
       if (block.source) {

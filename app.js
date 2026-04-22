@@ -2457,42 +2457,36 @@ async function analyzeDocument() {
   document.getElementById('doc-preview').style.display = 'none';
 
   try {
-    var contentBlock;
+    var pngBase64 = null;
+    var imgMediaType = 'image/png';
+
     if (docFileType === 'pdf') {
-      // PDFはそのままbase64でAPIに渡す（JPEG変換しない）
-      contentBlock = { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: docFileData } };
+      // PDF.jsで1ページ目をPNG画像に変換してからAPIに渡す
+      console.log('[analyzeDocument] PDF.jsでPNG変換開始');
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      var pdfData = Uint8Array.from(atob(docFileData), function(c) { return c.charCodeAt(0); });
+      var pdfDoc = await pdfjsLib.getDocument({ data: pdfData }).promise;
+      var page = await pdfDoc.getPage(1);
+      var viewport = page.getViewport({ scale: 2.0 });
+      var canvas = document.createElement('canvas');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      var ctx = canvas.getContext('2d');
+      await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+      var dataUrl = canvas.toDataURL('image/png');
+      pngBase64 = dataUrl.split(',')[1];
+      console.log('[analyzeDocument] PDF→PNG変換完了 canvas=', canvas.width, 'x', canvas.height, 'base64長=', pngBase64.length);
     } else {
-      // 画像はClaude API対応形式に正規化（非対応形式はjpegへフォールバック）
+      // 画像はそのまま使用（Claude API対応形式に正規化）
       var rawMime = window.docFileMime || 'image/jpeg';
       var supportedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-      var imgMediaType = supportedMimes.includes(rawMime) ? rawMime : 'image/jpeg';
+      imgMediaType = supportedMimes.includes(rawMime) ? rawMime : 'image/jpeg';
       if (imgMediaType !== rawMime) console.warn('[analyzeDocument] media_type フォールバック:', rawMime, '→', imgMediaType);
-      contentBlock = { type: 'image', source: { type: 'base64', media_type: imgMediaType, data: docFileData } };
+      pngBase64 = docFileData;
     }
-    console.log('[analyzeDocument] contentBlockタイプ=', contentBlock.type, 'mediaType=', contentBlock.source.media_type);
 
-    // DEBUG: APIリクエスト内容の詳細ログ
-    var debugRequestBody = {
-      model: CLAUDE_MODEL,
-      max_tokens: 1500,
-      usePdfBeta: docFileType === 'pdf',
-      messages_structure: {
-        role: 'user',
-        content_blocks: [
-          { type: contentBlock.type, media_type: contentBlock.source.media_type, data_length: contentBlock.source.data.length }
-        ]
-      }
-    };
-    console.log('[DEBUG] === APIリクエスト詳細 ===');
-    console.log('[DEBUG] model:', CLAUDE_MODEL);
-    console.log('[DEBUG] max_tokens:', 1500);
-    console.log('[DEBUG] usePdfBeta:', docFileType === 'pdf');
-    console.log('[DEBUG] contentBlock.type:', contentBlock.type);
-    console.log('[DEBUG] contentBlock.source.media_type:', contentBlock.source.media_type);
-    console.log('[DEBUG] base64データ長:', docFileData.length, 'chars (約', Math.round(docFileData.length * 3 / 4 / 1024), 'KB)');
-    console.log('[DEBUG] JSONボディ全体サイズ概算:', Math.round(JSON.stringify(debugRequestBody).length / 1024), 'KB (base64含む実サイズは別途)');
-    console.log('[DEBUG] messages構造:', JSON.stringify(debugRequestBody.messages_structure));
-    console.log('[DEBUG] === ここまで ===');
+    var contentBlock = { type: 'image', source: { type: 'base64', media_type: imgMediaType, data: pngBase64 } };
+    console.log('[analyzeDocument] contentBlock media_type=', imgMediaType, 'base64長=', pngBase64.length);
 
     var response = await fetch('/.netlify/functions/claude', {
       method: 'POST',
@@ -2500,7 +2494,7 @@ async function analyzeDocument() {
       body: JSON.stringify({
         model: CLAUDE_MODEL,
         max_tokens: 1500,
-        usePdfBeta: docFileType === 'pdf',
+        usePdfBeta: false,
         system: 'You are reading a Japanese home visit nursing instruction form (訪問看護指示書). Reply only in JSON. No explanation, no markdown.',
         messages: [{
           role: 'user',
