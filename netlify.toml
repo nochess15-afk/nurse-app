@@ -1,0 +1,7 @@
+[functions]
+  node_bundler = "esbuild"
+
+[[headers]]
+  for = "/.netlify/functions/*"
+    [headers.values]
+    Access-Control-Allow-Origin = "*"

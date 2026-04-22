@@ -2464,16 +2464,9 @@ async function analyzeDocument() {
 
   try {
     var contentBlock;
-    var apiHeaders = {
-      'Content-Type': 'application/json',
-      'x-api-key': getApiKey(),
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true'
-    };
 
     if (docFileType === 'pdf') {
-      // PDFはそのままbase64でAPIに渡す（anthropic-beta必須）
-      apiHeaders['anthropic-beta'] = 'pdfs-2024-09-25';
+      // PDFはそのままbase64でAPIに渡す（PDFベータ）
       contentBlock = { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: docFileData } };
       console.log('[analyzeDocument] PDF直接渡し base64長=', docFileData.length);
     } else {
@@ -2486,12 +2479,13 @@ async function analyzeDocument() {
       console.log('[analyzeDocument] 画像 media_type=', imgMediaType, 'base64長=', docFileData.length);
     }
 
-    var response = await fetch('https://api.anthropic.com/v1/messages', {
+    var response = await fetch('/.netlify/functions/claude', {
       method: 'POST',
-      headers: apiHeaders,
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: CLAUDE_MODEL,
         max_tokens: 1500,
+        usePdfBeta: docFileType === 'pdf',
         system: 'You are reading a Japanese home visit nursing instruction form (訪問看護指示書). Reply only in JSON. No explanation, no markdown.',
         messages: [{
           role: 'user',
