@@ -1,8 +1,4 @@
 // ===== 設定 =====
-// PDF.js workerSrc をページロード時に設定
-if (typeof pdfjsLib !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-}
 const SUPABASE_URL = 'https://cktxrkkeqdazcvamphhh.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNrdHhya2tlcWRhemN2YW1waGhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzNDU1MTYsImV4cCI6MjA4OTkyMTUxNn0.DlCMM0_Qu4qNSZ6znekMEmvXHXSU6QAD1wvyFFEIX78';
 const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
@@ -137,6 +133,12 @@ async function callClaude(systemPrompt, userPrompt, useFast, temperature) {
   return data.content[0].text;
 }
 
+
+function getApiKey() {
+  var key = localStorage.getItem('nurseapp_claude_key');
+  if (!key) throw new Error('Claude APIキーが設定されていません。管理者に連絡してください。');
+  return key;
+}
 
 // ===== 観察テンプレート読み込み（SOAP形式） =====
 async function loadObsTemplate() {
@@ -2461,46 +2463,35 @@ async function analyzeDocument() {
   document.getElementById('doc-preview').style.display = 'none';
 
   try {
-    var pngBase64 = null;
-    var imgMediaType = 'image/png';
+    var contentBlock;
+    var apiHeaders = {
+      'Content-Type': 'application/json',
+      'x-api-key': getApiKey(),
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    };
 
     if (docFileType === 'pdf') {
-      // PDF.jsで1ページ目をPNG画像に変換してからAPIに渡す
-      if (typeof pdfjsLib === 'undefined') {
-        throw new Error('PDF.jsが読み込まれていません。ページを再読み込みしてください。');
-      }
-      console.log('[analyzeDocument] PDF.jsでPNG変換開始');
-      var pdfData = Uint8Array.from(atob(docFileData), function(c) { return c.charCodeAt(0); });
-      var pdfDoc = await pdfjsLib.getDocument({ data: pdfData }).promise;
-      var page = await pdfDoc.getPage(1);
-      var viewport = page.getViewport({ scale: 2.0 });
-      var canvas = document.createElement('canvas');
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-      var ctx = canvas.getContext('2d');
-      await page.render({ canvasContext: ctx, viewport: viewport }).promise;
-      var dataUrl = canvas.toDataURL('image/png');
-      pngBase64 = dataUrl.split(',')[1];
-      console.log('[analyzeDocument] PDF→PNG変換完了 canvas=', canvas.width, 'x', canvas.height, 'base64長=', pngBase64.length);
+      // PDFはそのままbase64でAPIに渡す（anthropic-beta必須）
+      apiHeaders['anthropic-beta'] = 'pdfs-2024-09-25';
+      contentBlock = { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: docFileData } };
+      console.log('[analyzeDocument] PDF直接渡し base64長=', docFileData.length);
     } else {
-      // 画像はそのまま使用（Claude API対応形式に正規化）
+      // 画像はClaude API対応形式に正規化
       var rawMime = window.docFileMime || 'image/jpeg';
       var supportedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-      imgMediaType = supportedMimes.includes(rawMime) ? rawMime : 'image/jpeg';
+      var imgMediaType = supportedMimes.includes(rawMime) ? rawMime : 'image/jpeg';
       if (imgMediaType !== rawMime) console.warn('[analyzeDocument] media_type フォールバック:', rawMime, '→', imgMediaType);
-      pngBase64 = docFileData;
+      contentBlock = { type: 'image', source: { type: 'base64', media_type: imgMediaType, data: docFileData } };
+      console.log('[analyzeDocument] 画像 media_type=', imgMediaType, 'base64長=', docFileData.length);
     }
 
-    var contentBlock = { type: 'image', source: { type: 'base64', media_type: imgMediaType, data: pngBase64 } };
-    console.log('[analyzeDocument] contentBlock media_type=', imgMediaType, 'base64長=', pngBase64.length);
-
-    var response = await fetch('/.netlify/functions/claude', {
+    var response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: apiHeaders,
       body: JSON.stringify({
         model: CLAUDE_MODEL,
         max_tokens: 1500,
-        usePdfBeta: false,
         system: 'You are reading a Japanese home visit nursing instruction form (訪問看護指示書). Reply only in JSON. No explanation, no markdown.',
         messages: [{
           role: 'user',
