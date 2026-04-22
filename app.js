@@ -2411,11 +2411,19 @@ function readDocumentFile(input, type) {
   var file = input.files[0];
   if (!file) return;
 
-  // サイズチェック（PDFは5MB、画像は10MB上限）
-  var maxSize = type === 'pdf' ? 5 * 1024 * 1024 : 10 * 1024 * 1024;
+  // PDFは4MB上限（base64変換後約5.3MB、Netlify Functions 6MB制限以内）
+  // 画像はClaude API対応形式のみ（jpeg/png/gif/webp）
+  var maxSize = type === 'pdf' ? 4 * 1024 * 1024 : 10 * 1024 * 1024;
   if (file.size > maxSize) {
-    showStatus('⚠️ ファイルが大きすぎます。PDFは5MB以下、画像は10MB以下にしてください。', 5000);
+    showStatus('⚠️ ファイルが大きすぎます。PDFは4MB以下、画像は10MB以下にしてください。', 5000);
     return;
+  }
+  if (type === 'image') {
+    var supported = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (file.type && !supported.includes(file.type)) {
+      showStatus('⚠️ 非対応の画像形式です。JPEG・PNG形式でお試しください（HEICは変換が必要です）。', 6000);
+      return;
+    }
   }
 
   docFileType = type;
@@ -2449,11 +2457,16 @@ async function analyzeDocument() {
   document.getElementById('doc-preview').style.display = 'none';
 
   try {
-    var imgMediaType = window.docFileMime || (docFileType === 'pdf' ? 'application/pdf' : 'image/jpeg');
     var contentBlock;
     if (docFileType === 'pdf') {
+      // PDFはそのままbase64でAPIに渡す（JPEG変換しない）
       contentBlock = { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: docFileData } };
     } else {
+      // 画像はClaude API対応形式に正規化（非対応形式はjpegへフォールバック）
+      var rawMime = window.docFileMime || 'image/jpeg';
+      var supportedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+      var imgMediaType = supportedMimes.includes(rawMime) ? rawMime : 'image/jpeg';
+      if (imgMediaType !== rawMime) console.warn('[analyzeDocument] media_type フォールバック:', rawMime, '→', imgMediaType);
       contentBlock = { type: 'image', source: { type: 'base64', media_type: imgMediaType, data: docFileData } };
     }
     console.log('[analyzeDocument] contentBlockタイプ=', contentBlock.type, 'mediaType=', contentBlock.source.media_type);
