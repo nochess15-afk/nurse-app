@@ -1,4 +1,8 @@
 // ===== 設定 =====
+// PDF.js workerSrc をページロード時に設定
+if (typeof pdfjsLib !== 'undefined') {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
 const SUPABASE_URL = 'https://cktxrkkeqdazcvamphhh.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNrdHhya2tlcWRhemN2YW1waGhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzNDU1MTYsImV4cCI6MjA4OTkyMTUxNn0.DlCMM0_Qu4qNSZ6znekMEmvXHXSU6QAD1wvyFFEIX78';
 const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
@@ -2462,8 +2466,10 @@ async function analyzeDocument() {
 
     if (docFileType === 'pdf') {
       // PDF.jsで1ページ目をPNG画像に変換してからAPIに渡す
+      if (typeof pdfjsLib === 'undefined') {
+        throw new Error('PDF.jsが読み込まれていません。ページを再読み込みしてください。');
+      }
       console.log('[analyzeDocument] PDF.jsでPNG変換開始');
-      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
       var pdfData = Uint8Array.from(atob(docFileData), function(c) { return c.charCodeAt(0); });
       var pdfDoc = await pdfjsLib.getDocument({ data: pdfData }).promise;
       var page = await pdfDoc.getPage(1);
