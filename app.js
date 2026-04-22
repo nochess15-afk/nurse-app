@@ -1129,14 +1129,15 @@ async function generateObservations() {
   const name = document.getElementById('reg-name').value.trim();
   const age = document.getElementById('reg-age').value;
   const gender = document.getElementById('reg-gender').value;
-  const diagnosis = document.getElementById('reg-diagnosis').value.trim();
-  const history = document.getElementById('reg-history').value.trim();
-  const procedures = document.getElementById('reg-procedures').value.trim();
-  const adl = adlJsonToText(document.getElementById('reg-adl').value.trim());
+  const d1 = document.getElementById('reg-diagnosis1').value.trim();
+  const d2 = document.getElementById('reg-diagnosis2').value.trim();
+  const d3 = document.getElementById('reg-diagnosis3').value.trim();
+  const diagnosis = [d1, d2, d3].filter(Boolean).join('、');
   const notes = document.getElementById('reg-notes').value.trim();
+  const rehabilitation = document.getElementById('reg-rehabilitation').value.trim();
 
   if (!name) { showStatus('⚠️ 氏名を入力してください'); return; }
-  if (!diagnosis) { showStatus('⚠️ 主病名を入力してください'); return; }
+  if (!diagnosis) { showStatus('⚠️ 主たる傷病名を入力してください'); return; }
 
   const btn = event.target;
   btn.disabled = true;
@@ -1172,11 +1173,9 @@ ${diseaseList}
 ・AIの出力はあくまで看護師の判断を補助するものであり、最終判断は必ず担当看護師が行う`,
       `患者情報：
 氏名：${name}（${age}歳・${gender}）
-主病名：${diagnosis}
-既往歴：${history}
-医療処置：${procedures}
-ADL：${adl}
-特記事項：${notes}`
+主たる傷病名：${diagnosis}
+リハビリ指示：${rehabilitation}
+療養生活の留意事項：${notes}`
     );
 
     const aiItems = result.split('\n').filter(l => l.trim()).map(l => l.replace(/^[・\-\*]\s*/, '').trim()).filter(Boolean);
@@ -1234,14 +1233,6 @@ function toggleCheck(i) {
 
 async function savePatient() {
   const name = document.getElementById('reg-name').value.trim();
-  const age = document.getElementById('reg-age').value;
-  const gender = document.getElementById('reg-gender').value;
-  const diagnosis = document.getElementById('reg-diagnosis').value.trim();
-  const history = document.getElementById('reg-history').value.trim();
-  const procedures = document.getElementById('reg-procedures').value.trim();
-  const adl = document.getElementById('reg-adl').value.trim();
-  const notes = document.getElementById('reg-notes').value.trim();
-
   if (!name) { showStatus('⚠️ 氏名を入力してください'); return; }
 
   const btn = event.target;
@@ -1251,32 +1242,41 @@ async function savePatient() {
   try {
     // ① フォームデータ収集
     console.log('[savePatient] ① フォームデータ収集開始');
-    const medicines = getMedicinesFromRows('reg-medicines-rows');
-    const nurse = document.getElementById('reg-nurse') ? document.getElementById('reg-nurse').value.trim() : '';
-    const livingSituation = document.getElementById('reg-living-situation') ? document.getElementById('reg-living-situation').value.trim() : '';
+    const furigana = document.getElementById('reg-furigana').value.trim();
+    const age = document.getElementById('reg-age').value;
+    const gender = document.getElementById('reg-gender').value;
+    const diagnosis1 = document.getElementById('reg-diagnosis1').value.trim();
+    const diagnosis2 = document.getElementById('reg-diagnosis2').value.trim();
+    const diagnosis3 = document.getElementById('reg-diagnosis3').value.trim();
+    const mainDiagnosis = [diagnosis1, diagnosis2, diagnosis3].filter(Boolean).join('、');
+    const adlDegree = document.getElementById('reg-adl-degree').value.trim();
+    const dementia = document.getElementById('reg-dementia').value.trim();
+    const notes = document.getElementById('reg-notes').value.trim();
+    const rehabilitation = document.getElementById('reg-rehabilitation').value.trim();
     const keyPerson = document.getElementById('reg-key-person') ? document.getElementById('reg-key-person').value.trim() : '';
     const emergencyContact = document.getElementById('reg-emergency-contact') ? document.getElementById('reg-emergency-contact').value.trim() : '';
-    const caregiverNotes = document.getElementById('reg-caregiver-notes') ? document.getElementById('reg-caregiver-notes').value.trim() : '';
+    const medicines = getMedicinesFromRows('reg-medicines-rows');
     var allObsItems = COMMON_ITEMS.slice();
-    var diseaseObsResult = getDiseaseItems(diagnosis);
+    var diseaseObsResult = getDiseaseItems(mainDiagnosis);
     if (diseaseObsResult) allObsItems = allObsItems.concat(diseaseObsResult.items);
     if (observations && observations.length) allObsItems = allObsItems.concat(observations);
 
     const patientPayload = {
-      name, age: age ? parseInt(age) : null,
-      nurse: nurse || null,
+      name, furigana: furigana || null,
+      age: age ? parseInt(age) : null,
       gender: gender || null,
-      main_diagnosis: diagnosis || null,
-      medical_history: history || null,
-      medical_procedures: procedures || null,
-      adl: adl || null,
+      diagnosis1: diagnosis1 || null,
+      diagnosis2: diagnosis2 || null,
+      diagnosis3: diagnosis3 || null,
+      main_diagnosis: mainDiagnosis || null,
+      independence_level: adlDegree || null,
+      dementia_level: dementia || null,
       notes: notes || null,
+      rehabilitation: rehabilitation || null,
       medicines: medicines || null,
       observation_items: allObsItems.length ? allObsItems.join('\n') : null,
-      living_situation: livingSituation || null,
       key_person: keyPerson || null,
-      emergency_contact: emergencyContact || null,
-      caregiver_notes: caregiverNotes || null
+      emergency_contact: emergencyContact || null
     };
     console.log('[savePatient] payload:', patientPayload);
 
@@ -1424,20 +1424,42 @@ async function analyzeMedicinePhoto() {
   }
 }
 
+function selectDegreeBtn(btn) {
+  var targetId = btn.getAttribute('data-target');
+  var val = btn.getAttribute('data-val');
+  // 同グループの全ボタンを非選択に
+  document.querySelectorAll('.degree-btn[data-target="' + targetId + '"]').forEach(function(b) {
+    b.classList.remove('active');
+  });
+  // 既に選択中なら解除（トグル）
+  var hidden = document.getElementById(targetId);
+  if (hidden && hidden.value === val) {
+    hidden.value = '';
+  } else {
+    btn.classList.add('active');
+    if (hidden) hidden.value = val;
+  }
+}
+
+function setDegreeBtn(targetId, val) {
+  document.querySelectorAll('.degree-btn[data-target="' + targetId + '"]').forEach(function(b) {
+    b.classList.toggle('active', b.getAttribute('data-val') === val);
+  });
+  var hidden = document.getElementById(targetId);
+  if (hidden) hidden.value = val || '';
+}
+
 function clearRegForm() {
   renderMedicineRows('reg-medicines-rows', '');
-  ['reg-name','reg-age','reg-gender','reg-nurse','reg-diagnosis','reg-history','reg-procedures','reg-adl','reg-notes','reg-care-level','reg-independence','reg-dementia-level','reg-living-situation','reg-key-person','reg-emergency-contact','reg-caregiver-notes'].forEach(id => {
-    const el = document.getElementById(id);
+  ['reg-name','reg-furigana','reg-age','reg-gender',
+   'reg-diagnosis1','reg-diagnosis2','reg-diagnosis3',
+   'reg-adl-degree','reg-dementia',
+   'reg-notes','reg-rehabilitation','reg-key-person','reg-emergency-contact'].forEach(function(id) {
+    var el = document.getElementById(id);
     if (el) el.value = '';
   });
-  // ADLボタンをリセット
-  document.querySelectorAll('button[data-item]').forEach(function(b) {
-    b.style.background = '#fff';
-    b.style.color = '#64748b';
-    b.style.borderColor = '#cbd5e1';
-  });
-  var adlEl = document.getElementById('reg-adl');
-  if (adlEl) adlEl.value = '';
+  // degree-btn ボタンをリセット
+  document.querySelectorAll('.degree-btn').forEach(function(b) { b.classList.remove('active'); });
   document.getElementById('obs-card').style.display = 'none';
 }
 
@@ -2329,40 +2351,35 @@ async function savePatientOnly() {
   btn.innerHTML = '💾 保存中...';
 
   try {
+    const furigana2 = document.getElementById('reg-furigana').value.trim();
     const age = document.getElementById('reg-age').value;
     const gender = document.getElementById('reg-gender').value;
-    const diagnosis = document.getElementById('reg-diagnosis').value.trim();
-    const history = document.getElementById('reg-history').value.trim();
-    const procedures = document.getElementById('reg-procedures').value.trim();
-    const adl = document.getElementById('reg-adl').value.trim();
+    const diagnosis1 = document.getElementById('reg-diagnosis1').value.trim();
+    const diagnosis2 = document.getElementById('reg-diagnosis2').value.trim();
+    const diagnosis3 = document.getElementById('reg-diagnosis3').value.trim();
+    const mainDiagnosis2 = [diagnosis1, diagnosis2, diagnosis3].filter(Boolean).join('、');
+    const adlDegree2 = document.getElementById('reg-adl-degree').value.trim();
+    const dementia2 = document.getElementById('reg-dementia').value.trim();
     const notes = document.getElementById('reg-notes').value.trim();
-    const nurse = document.getElementById('reg-nurse') ? document.getElementById('reg-nurse').value.trim() : '';
+    const rehabilitation2 = document.getElementById('reg-rehabilitation').value.trim();
     const medicines = getMedicinesFromRows('reg-medicines-rows');
-
-    const careLevel2 = document.getElementById('reg-care-level') ? document.getElementById('reg-care-level').value : '';
-    const independence2 = document.getElementById('reg-independence') ? document.getElementById('reg-independence').value : '';
-    const dementiaLevel2 = document.getElementById('reg-dementia-level') ? document.getElementById('reg-dementia-level').value : '';
-    const livingSituation2 = document.getElementById('reg-living-situation') ? document.getElementById('reg-living-situation').value.trim() : '';
     const keyPerson2 = document.getElementById('reg-key-person') ? document.getElementById('reg-key-person').value.trim() : '';
     const emergencyContact2 = document.getElementById('reg-emergency-contact') ? document.getElementById('reg-emergency-contact').value.trim() : '';
-    const caregiverNotes2 = document.getElementById('reg-caregiver-notes') ? document.getElementById('reg-caregiver-notes').value.trim() : '';
     const payload = {
-      name, age: age ? parseInt(age) : null,
+      name, furigana: furigana2 || null,
+      age: age ? parseInt(age) : null,
       gender: gender || null,
-      nurse: nurse || null,
-      main_diagnosis: diagnosis || null,
-      medical_history: history || null,
-      medical_procedures: procedures || null,
-      adl: adl || null,
+      diagnosis1: diagnosis1 || null,
+      diagnosis2: diagnosis2 || null,
+      diagnosis3: diagnosis3 || null,
+      main_diagnosis: mainDiagnosis2 || null,
+      independence_level: adlDegree2 || null,
+      dementia_level: dementia2 || null,
       notes: notes || null,
+      rehabilitation: rehabilitation2 || null,
       medicines: medicines || null,
-      care_level: careLevel2 || null,
-      independence_level: independence2 || null,
-      dementia_level: dementiaLevel2 || null,
-      living_situation: livingSituation2 || null,
       key_person: keyPerson2 || null,
-      emergency_contact: emergencyContact2 || null,
-      caregiver_notes: caregiverNotes2 || null
+      emergency_contact: emergencyContact2 || null
     };
 
     if (window.editingPatientId) {
@@ -2448,14 +2465,14 @@ async function analyzeDocument() {
         model: CLAUDE_MODEL,
         max_tokens: 1500,
         usePdfBeta: docFileType === 'pdf',
-        system: 'あなたは訪問看護指示書の読み取り専門AIです。JSONのみで返答してください。前置き・説明・マークダウン不要。',
+        system: 'あなたは訪問看護指示書の読み取り専門AIです。JSONのみで返答。前置き・説明・マークダウン不要。',
         messages: [{
           role: 'user',
           content: [
             contentBlock,
             {
               type: 'text',
-              text: 'この訪問看護指示書の画像から以下の項目を正確に読み取ってください。\n手書き文字が含まれています。各フィールドの枠・ラベルを手がかりに正確に読んでください。\n\n必ず以下のJSON形式のみで返答してください：\n{\n  "name": "患者氏名（ふりがなではなく漢字氏名）",\n  "age": "年齢（数字のみ）",\n  "gender": "男性 or 女性",\n  "diagnosis": "主たる傷病名の欄の内容をそのまま",\n  "medicines": "投与中の薬剤（薬剤名・用量・用法を1行1薬剤で、錠・mg・回などの単位を正確に）",\n  "adl": "寝たきり度の該当記号",\n  "rehabilitation": "リハビリテーションの指示内容",\n  "notes": "留意事項・療養生活指導上の留意事項の内容"\n}'
+              text: '訪問看護指示書（省令様式・全国共通）を読み取ります。\n各フィールドの位置を以下に明示します。厳密に従ってください。\n\n【患者氏名】「患者氏名」ラベル右の欄。必ず漢字氏名を読む。ふりがなは別フィールド。\n【ふりがな】「ふりがな」ラベル右の欄。ひらがなで読む。\n【年齢】生年月日欄の右端（XX歳）の数字のみ。\n【主たる傷病名】「主たる傷病名」の(1)(2)(3)欄の病名のみ。リハビリ内容・指示事項は絶対に含めない。\n【寝たきり度】「寝たきり度」欄でJ1/J2/A1/A2/B1/B2/C1/C2のうち○または記載のある記号。\n【認知症の状況】「認知症の状況」欄でⅠ/Ⅱa/Ⅱb/Ⅲa/Ⅲb/Ⅳ/Mのうち○または記載のある記号。\n【投与中の薬剤】「投与中の薬剤」欄1〜6番の薬剤名・用量・用法。1行1薬剤。「銭」「钱」「鏡」は必ず「錠」に修正。\n【療養生活の留意事項】「療養生活指導上の留意事項」欄の記載内容のみ。\n【リハビリ指示】「リハビリテーション」欄の分数・週回数・屋外歩行訓練可否・ST訓練可否。\n【既往歴】この書類に既往歴欄は存在しない。必ず空文字にすること。\n\n{\n  "name": "漢字氏名",\n  "furigana": "ひらがな",\n  "age": "数字のみ",\n  "gender": "",\n  "diagnosis1": "傷病名①",\n  "diagnosis2": "傷病名②",\n  "diagnosis3": "傷病名③",\n  "adl": "寝たきり度記号",\n  "dementia": "認知症度記号",\n  "medicines": "1行1薬剤",\n  "notes": "療養生活の留意事項",\n  "rehabilitation": "リハビリ指示内容",\n  "history": ""\n}'
             }
           ]
         }]
@@ -2544,24 +2561,22 @@ function confirmDocForm() {
   var normalizedMedicines = window._docNormalizedMedicines || '';
   document.getElementById('doc-confirm-modal').style.display = 'none';
 
-  // 確認モーダルで編集された3フィールドを優先
   var confirmedName = document.getElementById('doc-confirm-name').value.trim();
   var confirmedDiagnosis = document.getElementById('doc-confirm-diagnosis').value.trim();
   var confirmedAge = document.getElementById('doc-confirm-age').value.trim();
 
-  if (confirmedName)     document.getElementById('reg-name').value = confirmedName;
-  if (confirmedAge)      document.getElementById('reg-age').value = confirmedAge;
-  if (parsed.gender)     document.getElementById('reg-gender').value = parsed.gender;
-  if (confirmedDiagnosis) document.getElementById('reg-diagnosis').value = confirmedDiagnosis;
-  if (parsed.adl)        document.getElementById('reg-adl').value = parsed.adl;
-  if (parsed.notes)      document.getElementById('reg-notes').value = parsed.notes;
-  if (parsed.rehabilitation) {
-    var hist = document.getElementById('reg-history');
-    if (hist) hist.value = parsed.rehabilitation;
-  }
-  if (normalizedMedicines) {
-    renderMedicineRows('reg-medicines-rows', normalizedMedicines);
-  }
+  if (confirmedName)  document.getElementById('reg-name').value = confirmedName;
+  document.getElementById('reg-furigana').value = parsed.furigana || '';
+  if (confirmedAge)   document.getElementById('reg-age').value = confirmedAge;
+  if (parsed.gender)  document.getElementById('reg-gender').value = parsed.gender;
+  document.getElementById('reg-diagnosis1').value = confirmedDiagnosis || parsed.diagnosis1 || '';
+  document.getElementById('reg-diagnosis2').value = parsed.diagnosis2 || '';
+  document.getElementById('reg-diagnosis3').value = parsed.diagnosis3 || '';
+  if (parsed.adl)     setDegreeBtn('reg-adl-degree', parsed.adl);
+  if (parsed.dementia) setDegreeBtn('reg-dementia', parsed.dementia);
+  if (parsed.notes)   document.getElementById('reg-notes').value = parsed.notes;
+  if (parsed.rehabilitation) document.getElementById('reg-rehabilitation').value = parsed.rehabilitation;
+  if (normalizedMedicines) renderMedicineRows('reg-medicines-rows', normalizedMedicines);
 
   console.log('[confirmDocForm] フォームセット完了');
   showStatus('✅ 患者情報を入力しました。内容を確認して保存してください');
@@ -3443,30 +3458,21 @@ async function editPatientBtn(btn) {
 
     // フォームに値を入れる
     document.getElementById('reg-name').value = p.name || '';
+    document.getElementById('reg-furigana').value = p.furigana || '';
     document.getElementById('reg-age').value = p.age || '';
     document.getElementById('reg-gender').value = p.gender || '';
-    var nurseEl = document.getElementById('reg-nurse');
-    if (nurseEl) nurseEl.value = p.nurse || '';
-    document.getElementById('reg-diagnosis').value = p.main_diagnosis || '';
-    document.getElementById('reg-history').value = p.medical_history || '';
-    document.getElementById('reg-procedures').value = p.medical_procedures || '';
-    setAdlFromJson(p.adl || '');
+    document.getElementById('reg-diagnosis1').value = p.diagnosis1 || '';
+    document.getElementById('reg-diagnosis2').value = p.diagnosis2 || '';
+    document.getElementById('reg-diagnosis3').value = p.diagnosis3 || '';
+    setDegreeBtn('reg-adl-degree', p.independence_level || '');
+    setDegreeBtn('reg-dementia', p.dementia_level || '');
     document.getElementById('reg-notes').value = p.notes || '';
+    document.getElementById('reg-rehabilitation').value = p.rehabilitation || '';
     renderMedicineRows('reg-medicines-rows', p.medicines || '');
-    var clEl = document.getElementById('reg-care-level');
-    if (clEl) clEl.value = p.care_level || '';
-    var ilEl = document.getElementById('reg-independence');
-    if (ilEl) ilEl.value = p.independence_level || '';
-    var dlEl = document.getElementById('reg-dementia-level');
-    if (dlEl) dlEl.value = p.dementia_level || '';
-    var lsEl = document.getElementById('reg-living-situation');
-    if (lsEl) lsEl.value = p.living_situation || '';
     var kpEl = document.getElementById('reg-key-person');
     if (kpEl) kpEl.value = p.key_person || '';
     var ecEl = document.getElementById('reg-emergency-contact');
     if (ecEl) ecEl.value = p.emergency_contact || '';
-    var cnEl = document.getElementById('reg-caregiver-notes');
-    if (cnEl) cnEl.value = p.caregiver_notes || '';
 
     // 編集モードのIDを保持・保存ボタンのテキスト変更
     window.editingPatientId = id;
@@ -3497,16 +3503,13 @@ function togglePatientDetail() {
   if (isHidden) {
     var p = currentPatient;
     var rows = [
-      { label: '担当看護師', value: p.nurse },
-      { label: '主病名', value: p.main_diagnosis },
-      { label: '既往歴', value: p.medical_history },
-      { label: '医療処置', value: p.medical_procedures },
-      { label: 'ADL', value: adlJsonToText(p.adl) },
-      { label: '特記事項', value: p.notes },
-      { label: '生活状況', value: p.living_situation },
+      { label: '主たる傷病名', value: [p.diagnosis1, p.diagnosis2, p.diagnosis3].filter(Boolean).join('　') || p.main_diagnosis },
+      { label: '寝たきり度', value: p.independence_level },
+      { label: '認知症の状況', value: p.dementia_level },
+      { label: '療養生活の留意事項', value: p.notes },
+      { label: 'リハビリ指示内容', value: p.rehabilitation },
       { label: 'キーパーソン', value: p.key_person },
       { label: '緊急連絡先', value: p.emergency_contact },
-      { label: '介護者・家族の状況', value: p.caregiver_notes },
     ].filter(function(r) { return r.value; });
 
     var html = rows.map(function(r) {
@@ -3536,24 +3539,21 @@ function editCurrentPatient() {
 
   var p = currentPatient;
   document.getElementById('reg-name').value = p.name || '';
+  document.getElementById('reg-furigana').value = p.furigana || '';
   document.getElementById('reg-age').value = p.age || '';
   document.getElementById('reg-gender').value = p.gender || '';
-  var nurseEl = document.getElementById('reg-nurse');
-  if (nurseEl) nurseEl.value = p.nurse || '';
-  document.getElementById('reg-diagnosis').value = p.main_diagnosis || '';
-  document.getElementById('reg-history').value = p.medical_history || '';
-  document.getElementById('reg-procedures').value = p.medical_procedures || '';
-  setAdlFromJson(p.adl || '');
+  document.getElementById('reg-diagnosis1').value = p.diagnosis1 || '';
+  document.getElementById('reg-diagnosis2').value = p.diagnosis2 || '';
+  document.getElementById('reg-diagnosis3').value = p.diagnosis3 || '';
+  setDegreeBtn('reg-adl-degree', p.independence_level || '');
+  setDegreeBtn('reg-dementia', p.dementia_level || '');
   document.getElementById('reg-notes').value = p.notes || '';
+  document.getElementById('reg-rehabilitation').value = p.rehabilitation || '';
   renderMedicineRows('reg-medicines-rows', p.medicines || '');
-  var lsEl2 = document.getElementById('reg-living-situation');
-  if (lsEl2) lsEl2.value = p.living_situation || '';
   var kpEl2 = document.getElementById('reg-key-person');
   if (kpEl2) kpEl2.value = p.key_person || '';
   var ecEl2 = document.getElementById('reg-emergency-contact');
   if (ecEl2) ecEl2.value = p.emergency_contact || '';
-  var cnEl2 = document.getElementById('reg-caregiver-notes');
-  if (cnEl2) cnEl2.value = p.caregiver_notes || '';
 
   window.editingPatientId = p.id;
   var saveBtn = document.querySelector('button[onclick="savePatient()"]');

@@ -269,6 +269,15 @@
   }
   .btn-full { width: 100%; justify-content: center; }
   .btn-sm { font-size: 11px; padding: 5px 10px; }
+  .degree-btn {
+    font-family: 'Noto Sans JP', sans-serif; font-size: 13px; font-weight: 700;
+    padding: 6px 14px; border-radius: 20px; border: 1.5px solid var(--border);
+    background: var(--surface); color: var(--text-secondary); cursor: pointer;
+    transition: all 0.15s;
+  }
+  .degree-btn.active {
+    background: var(--primary); color: white; border-color: var(--primary);
+  }
 
   /* ローディング */
   .loading-dot {

@@ -324,6 +324,10 @@
           <input type="text" id="reg-name" placeholder="例：田中 花子">
         </div>
         <div class="form-group">
+          <label>ふりがな</label>
+          <input type="text" id="reg-furigana" placeholder="例：たなか はなこ">
+        </div>
+        <div class="form-group">
           <label>年齢</label>
           <input type="number" id="reg-age" placeholder="例：78" min="0" max="120">
         </div>
@@ -336,101 +340,41 @@
             <option value="その他">その他</option>
           </select>
         </div>
-        <div class="form-group">
-        <div class="form-group">
-          <label>担当看護師</label>
-          <input type="text" id="reg-nurse" placeholder="例：田中、山田">
-        </div>
-          <label>主病名</label>
-          <input type="text" id="reg-diagnosis" placeholder="例：脳梗塞後遺症">
-        </div>
-        <div class="form-group">
-          <label>要介護度</label>
-          <select id="reg-care-level">
-            <option value="">選択</option>
-            <option value="要支援1">要支援1</option>
-            <option value="要支援2">要支援2</option>
-            <option value="要介護1">要介護1</option>
-            <option value="要介護2">要介護2</option>
-            <option value="要介護3">要介護3</option>
-            <option value="要介護4">要介護4</option>
-            <option value="要介護5">要介護5</option>
-            <option value="医療保険">医療保険</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>障害高齢者の日常生活自立度</label>
-          <select id="reg-independence">
-            <option value="">選択</option>
-            <option value="自立">自立</option>
-            <option value="J1">J1</option>
-            <option value="J2">J2</option>
-            <option value="A1">A1</option>
-            <option value="A2">A2</option>
-            <option value="B1">B1</option>
-            <option value="B2">B2</option>
-            <option value="C1">C1</option>
-            <option value="C2">C2</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>認知症高齢者の日常生活自立度</label>
-          <select id="reg-dementia-level">
-            <option value="">選択</option>
-            <option value="自立">自立</option>
-            <option value="Ⅰ">Ⅰ</option>
-            <option value="Ⅱa">Ⅱa</option>
-            <option value="Ⅱb">Ⅱb</option>
-            <option value="Ⅲa">Ⅲa</option>
-            <option value="Ⅲb">Ⅲb</option>
-            <option value="Ⅳ">Ⅳ</option>
-            <option value="M">M</option>
-          </select>
-        </div>
         <div class="form-group full">
-          <label>既往歴</label>
-          <textarea id="reg-history" placeholder="例：高血圧、糖尿病、心房細動" rows="2"></textarea>
-        </div>
-        <div class="form-group full">
-          <label>医療処置</label>
-          <textarea id="reg-procedures" placeholder="例：胃瘻管理、吸引、褥瘡処置" rows="2"></textarea>
-        </div>
-        <div class="form-group full">
-          <label>ADL（日常生活動作）</label>
-          <input type="hidden" id="reg-adl">
-          <button type="button" id="adl-toggle-btn" onclick="toggleAdlPanel()" style="font-family:'Noto Sans JP',sans-serif;font-size:13px;font-weight:700;padding:8px 16px;border-radius:20px;border:1.5px solid var(--border);background:var(--surface);color:var(--text-primary);cursor:pointer;width:100%;text-align:left;transition:all 0.18s">ADL入力 ▼</button>
-          <div id="adl-panel" style="display:none;margin-top:8px;border:1.5px solid var(--border);border-radius:12px;padding:14px;background:var(--surface)">
-            <div style="font-size:11px;font-weight:700;color:var(--primary);margin-bottom:10px;letter-spacing:0.5px">▍基本ADL</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 16px" class="adl-grid">
-              <div id="adl-basic-left"></div>
-              <div id="adl-basic-right"></div>
-            </div>
-            <div style="font-size:11px;font-weight:700;color:var(--primary);margin:14px 0 10px;letter-spacing:0.5px">▍手段的ADL</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 16px" class="adl-grid">
-              <div id="adl-iadl-left"></div>
-              <div id="adl-iadl-right"></div>
-            </div>
+          <label>主たる傷病名</label>
+          <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px">
+            <input type="text" id="reg-diagnosis1" placeholder="① 例：脳梗塞後遺症">
+            <input type="text" id="reg-diagnosis2" placeholder="②">
+            <input type="text" id="reg-diagnosis3" placeholder="③">
           </div>
         </div>
         <div class="form-group full">
-          <label>特記事項</label>
-          <textarea id="reg-notes" placeholder="例：家族の介護力、住環境、本人の意向など" rows="3"></textarea>
+          <label>寝たきり度</label>
+          <input type="hidden" id="reg-adl-degree">
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">
+            <button type="button" class="degree-btn" data-target="reg-adl-degree" data-val="J1" onclick="selectDegreeBtn(this)">J1</button>
+            <button type="button" class="degree-btn" data-target="reg-adl-degree" data-val="J2" onclick="selectDegreeBtn(this)">J2</button>
+            <button type="button" class="degree-btn" data-target="reg-adl-degree" data-val="A1" onclick="selectDegreeBtn(this)">A1</button>
+            <button type="button" class="degree-btn" data-target="reg-adl-degree" data-val="A2" onclick="selectDegreeBtn(this)">A2</button>
+            <button type="button" class="degree-btn" data-target="reg-adl-degree" data-val="B1" onclick="selectDegreeBtn(this)">B1</button>
+            <button type="button" class="degree-btn" data-target="reg-adl-degree" data-val="B2" onclick="selectDegreeBtn(this)">B2</button>
+            <button type="button" class="degree-btn" data-target="reg-adl-degree" data-val="C1" onclick="selectDegreeBtn(this)">C1</button>
+            <button type="button" class="degree-btn" data-target="reg-adl-degree" data-val="C2" onclick="selectDegreeBtn(this)">C2</button>
+          </div>
         </div>
         <div class="form-group full">
-          <label>生活状況</label>
-          <input type="text" id="reg-living-situation" placeholder="例：独居、家族同居、日中独居、施設">
-        </div>
-        <div class="form-group">
-          <label>キーパーソン</label>
-          <input type="text" id="reg-key-person" placeholder="例：長女（田中花子）">
-        </div>
-        <div class="form-group">
-          <label>緊急連絡先</label>
-          <input type="text" id="reg-emergency-contact" placeholder="例：090-1234-5678（長女）">
-        </div>
-        <div class="form-group full">
-          <label>介護者・家族の状況</label>
-          <textarea id="reg-caregiver-notes" placeholder="例：長女が主介護者、週末のみ対応可。介護疲れあり" rows="2"></textarea>
+          <label>認知症の状況</label>
+          <input type="hidden" id="reg-dementia">
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">
+            <button type="button" class="degree-btn" data-target="reg-dementia" data-val="Ⅰ" onclick="selectDegreeBtn(this)">Ⅰ</button>
+            <button type="button" class="degree-btn" data-target="reg-dementia" data-val="Ⅱa" onclick="selectDegreeBtn(this)">Ⅱa</button>
+            <button type="button" class="degree-btn" data-target="reg-dementia" data-val="Ⅱb" onclick="selectDegreeBtn(this)">Ⅱb</button>
+            <button type="button" class="degree-btn" data-target="reg-dementia" data-val="Ⅲa" onclick="selectDegreeBtn(this)">Ⅲa</button>
+            <button type="button" class="degree-btn" data-target="reg-dementia" data-val="Ⅲb" onclick="selectDegreeBtn(this)">Ⅲb</button>
+            <button type="button" class="degree-btn" data-target="reg-dementia" data-val="Ⅳ" onclick="selectDegreeBtn(this)">Ⅳ</button>
+            <button type="button" class="degree-btn" data-target="reg-dementia" data-val="M" onclick="selectDegreeBtn(this)">M</button>
+            <button type="button" class="degree-btn" data-target="reg-dementia" data-val="なし" onclick="selectDegreeBtn(this)">なし</button>
+          </div>
         </div>
         <div class="form-group full">
           <label>内服薬リスト</label>
@@ -452,6 +396,22 @@
               🤖 AIで読み取る
             </button>
           </div>
+        </div>
+        <div class="form-group full">
+          <label>療養生活の留意事項</label>
+          <textarea id="reg-notes" placeholder="例：療養生活指導上の留意事項の記載内容" rows="3"></textarea>
+        </div>
+        <div class="form-group full">
+          <label>リハビリ指示内容</label>
+          <textarea id="reg-rehabilitation" placeholder="例：週3回・1回20分、屋外歩行訓練可" rows="2"></textarea>
+        </div>
+        <div class="form-group">
+          <label>キーパーソン</label>
+          <input type="text" id="reg-key-person" placeholder="例：長女（田中花子）">
+        </div>
+        <div class="form-group">
+          <label>緊急連絡先</label>
+          <input type="text" id="reg-emergency-contact" placeholder="例：090-1234-5678（長女）">
         </div>
       </div>
       <hr class="divider">
