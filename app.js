@@ -2411,29 +2411,34 @@ async function savePatientOnly() {
 
 // ===== 書類から患者情報読み取り =====
 var docFileData = null;
-var docFileType = null;
+var docFileMimeType = null;
 
-function readDocumentFile(input, type) {
+function readDocumentFile(input) {
   var file = input.files[0];
   if (!file) return;
 
-  // PDFは4MB上限（base64変換後約5.3MB、Netlify Functions 6MB制限以内）
-  // 画像はClaude API対応形式のみ（jpeg/png/gif/webp）
-  var maxSize = type === 'pdf' ? 4 * 1024 * 1024 : 10 * 1024 * 1024;
-  if (file.size > maxSize) {
-    showStatus('⚠️ ファイルが大きすぎます。PDFは4MB以下、画像は10MB以下にしてください。', 5000);
+  // PDFは拒否
+  if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+    showStatus('⚠️ PDFは非対応です。指示書はカメラで撮影したJPEG写真でお読み込みください。', 7000);
+    input.value = '';
     return;
   }
-  if (type === 'image') {
-    var supported = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-    if (file.type && !supported.includes(file.type)) {
-      showStatus('⚠️ 非対応の画像形式です。JPEG・PNG形式でお試しください（HEICは変換が必要です）。', 6000);
-      return;
-    }
+
+  // JPEG/PNG/WebP/GIF のみ対応
+  var supported = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+  if (file.type && !supported.includes(file.type)) {
+    showStatus('⚠️ 非対応の画像形式です。JPEG・PNG形式でお試しください。', 6000);
+    input.value = '';
+    return;
   }
 
-  docFileType = type;
-  window.docFileMime = file.type || (type === 'pdf' ? 'application/pdf' : 'image/jpeg');
+  if (file.size > 10 * 1024 * 1024) {
+    showStatus('⚠️ ファイルが大きすぎます。10MB以下の画像を選択してください。', 5000);
+    input.value = '';
+    return;
+  }
+
+  docFileMimeType = file.type || 'image/jpeg';
 
   var reader = new FileReader();
   reader.onload = function(e) {
@@ -2441,15 +2446,10 @@ function readDocumentFile(input, type) {
     var preview = document.getElementById('doc-preview');
     var img = document.getElementById('doc-img');
     var filename = document.getElementById('doc-filename');
+    img.src = e.target.result;
+    img.style.display = '';
+    filename.textContent = file.name;
     preview.style.display = '';
-    if (type === 'image') {
-      img.src = e.target.result;
-      img.style.display = '';
-      filename.textContent = file.name;
-    } else {
-      img.style.display = 'none';
-      filename.textContent = '📎 ' + file.name;
-    }
   };
   reader.readAsDataURL(file);
 }
@@ -2463,21 +2463,9 @@ async function analyzeDocument() {
   document.getElementById('doc-preview').style.display = 'none';
 
   try {
-    var contentBlock;
-
-    if (docFileType === 'pdf') {
-      // PDFはそのままbase64でAPIに渡す（PDFベータ）
-      contentBlock = { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: docFileData } };
-      console.log('[analyzeDocument] PDF直接渡し base64長=', docFileData.length);
-    } else {
-      // 画像はClaude API対応形式に正規化
-      var rawMime = window.docFileMime || 'image/jpeg';
-      var supportedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-      var imgMediaType = supportedMimes.includes(rawMime) ? rawMime : 'image/jpeg';
-      if (imgMediaType !== rawMime) console.warn('[analyzeDocument] media_type フォールバック:', rawMime, '→', imgMediaType);
-      contentBlock = { type: 'image', source: { type: 'base64', media_type: imgMediaType, data: docFileData } };
-      console.log('[analyzeDocument] 画像 media_type=', imgMediaType, 'base64長=', docFileData.length);
-    }
+    var mediaType = docFileMimeType || 'image/jpeg';
+    var contentBlock = { type: 'image', source: { type: 'base64', media_type: mediaType, data: docFileData } };
+    console.log('[analyzeDocument] 画像送信 media_type=', mediaType, 'base64長=', docFileData.length);
 
     var response = await fetch('/.netlify/functions/claude', {
       method: 'POST',
@@ -2485,15 +2473,15 @@ async function analyzeDocument() {
       body: JSON.stringify({
         model: CLAUDE_MODEL,
         max_tokens: 1500,
-        usePdfBeta: docFileType === 'pdf',
-        system: 'You are reading a Japanese home visit nursing instruction form (訪問看護指示書). Reply only in JSON. No explanation, no markdown.',
+        usePdfBeta: false,
+        system: 'You are reading a Japanese home visit nursing instruction form. Reply only in JSON. No markdown.',
         messages: [{
           role: 'user',
           content: [
             contentBlock,
             {
               type: 'text',
-              text: 'Look at this document and tell me exactly what you see written in each field. Do not interpret or infer. Just read what is physically written.\n\nReturn this exact JSON:\n{\n  "name": "what is handwritten in 患者氏名 field",\n  "furigana": "what is handwritten in ふりがな field",\n  "age": "number only from age field",\n  "gender": "性別",\n  "diagnosis1": "what is written in 主たる傷病名(1)",\n  "diagnosis2": "what is written in 主たる傷病名(2)",\n  "diagnosis3": "what is written in 主たる傷病名(3)",\n  "adl": "which ONE symbol has a handwritten circle ○ in 寝たきり度 row: J1/J2/A1/A2/B1/B2/C1/C2",\n  "dementia": "which ONE symbol has a handwritten circle ○ in 認知症の状況 row: Ⅰ/Ⅱa/Ⅱb/Ⅲa/Ⅲb/Ⅳ/M",\n  "medicines": "only the handwritten drug names and dosages in 投与中の薬剤 fields, one per line",\n  "notes": "what is handwritten in 療養生活指導上の留意事項",\n  "rehabilitation": "only the handwritten numbers and checked items in リハビリテーション section",\n  "history": ""\n}'
+              text: 'Read this photo of a Japanese 訪問看護指示書 and extract exactly what is written. Return only this JSON:\n{\n  "name": "kanji name in 患者氏名 field",\n  "furigana": "reading in ふりがな field",\n  "age": "number only",\n  "gender": "男性 or 女性",\n  "diagnosis1": "disease name in 主たる傷病名(1)",\n  "diagnosis2": "disease name in 主たる傷病名(2)",\n  "diagnosis3": "disease name in 主たる傷病名(3)",\n  "adl": "one symbol with handwritten circle in 寝たきり度: J1/J2/A1/A2/B1/B2/C1/C2",\n  "dementia": "one symbol with handwritten circle in 認知症の状況: Ⅰ/Ⅱa/Ⅱb/Ⅲa/Ⅲb/Ⅳ/M",\n  "medicines": "only handwritten drug names and dosages, one per line. 銭/钱/鏡→錠. Exclude any printed text.",\n  "notes": "handwritten text in 療養生活指導上の留意事項",\n  "rehabilitation": "only handwritten numbers and circled items in リハビリ section",\n  "history": ""\n}'
             }
           ]
         }]
