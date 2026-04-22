@@ -2478,14 +2478,14 @@ async function analyzeDocument() {
         model: CLAUDE_MODEL,
         max_tokens: 1500,
         usePdfBeta: docFileType === 'pdf',
-        system: 'あなたは訪問看護指示書の読み取り専門AIです。JSONのみで返答。前置き・説明・マークダウン不要。',
+        system: 'You are reading a Japanese home visit nursing instruction form (訪問看護指示書). Reply only in JSON. No explanation, no markdown.',
         messages: [{
           role: 'user',
           content: [
             contentBlock,
             {
               type: 'text',
-              text: '訪問看護指示書（省令様式・全国共通）を読み取ります。\n各フィールドの位置を以下に明示します。厳密に従ってください。\n\n【患者氏名】「患者氏名」ラベル右の欄。必ず漢字氏名を読む。ふりがなは別フィールド。\n【ふりがな】「ふりがな」ラベル右の欄。ひらがなで読む。\n【年齢】生年月日欄の右端（XX歳）の数字のみ。\n【主たる傷病名】「主たる傷病名」の(1)(2)(3)欄の病名のみ。リハビリ内容・指示事項は絶対に含めない。\n【寝たきり度】「寝たきり度」欄でJ1/J2/A1/A2/B1/B2/C1/C2のうち○または記載のある記号。\n【認知症の状況】「認知症の状況」欄でⅠ/Ⅱa/Ⅱb/Ⅲa/Ⅲb/Ⅳ/Mのうち○または記載のある記号。\n【投与中の薬剤】「投与中の薬剤」「現在の投与中の薬剤」欄の1〜6番に記載された薬剤名・用量・用法のみ。1行1薬剤。「銭」「钱」「鏡」は必ず「錠」に修正。「パーキンソン病の場合」「ホーエン・ヤールの重症度分類」「生活機能障害度」などの注記文・説明文は薬剤ではないので絶対に含めない。薬剤名・用量・用法以外の文字列は一切含めない。\n【療養生活の留意事項】「療養生活指導上の留意事項」欄の記載内容のみ。\n【リハビリ指示】「リハビリテーション」欄の分数・週回数・屋外歩行訓練可否・ST訓練可否。\n【既往歴】この書類に既往歴欄は存在しない。必ず空文字にすること。\n\n{\n  "name": "漢字氏名",\n  "furigana": "ひらがな",\n  "age": "数字のみ",\n  "gender": "",\n  "diagnosis1": "傷病名①",\n  "diagnosis2": "傷病名②",\n  "diagnosis3": "傷病名③",\n  "adl": "寝たきり度記号",\n  "dementia": "認知症度記号",\n  "medicines": "1行1薬剤",\n  "notes": "療養生活の留意事項",\n  "rehabilitation": "リハビリ指示内容",\n  "history": ""\n}'
+              text: 'Look at this document and tell me exactly what you see written in each field. Do not interpret or infer. Just read what is physically written.\n\nReturn this exact JSON:\n{\n  "name": "what is handwritten in 患者氏名 field",\n  "furigana": "what is handwritten in ふりがな field",\n  "age": "number only from age field",\n  "gender": "性別",\n  "diagnosis1": "what is written in 主たる傷病名(1)",\n  "diagnosis2": "what is written in 主たる傷病名(2)",\n  "diagnosis3": "what is written in 主たる傷病名(3)",\n  "adl": "which ONE symbol has a handwritten circle ○ in 寝たきり度 row: J1/J2/A1/A2/B1/B2/C1/C2",\n  "dementia": "which ONE symbol has a handwritten circle ○ in 認知症の状況 row: Ⅰ/Ⅱa/Ⅱb/Ⅲa/Ⅲb/Ⅳ/M",\n  "medicines": "only the handwritten drug names and dosages in 投与中の薬剤 fields, one per line",\n  "notes": "what is handwritten in 療養生活指導上の留意事項",\n  "rehabilitation": "only the handwritten numbers and checked items in リハビリテーション section",\n  "history": ""\n}'
             }
           ]
         }]
