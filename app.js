@@ -2510,6 +2510,7 @@ async function analyzeDocument() {
   console.log('[analyzeDocument] 呼び出し docFileData=', docFileData ? '有り(' + docFileData.length + 'chars)' : 'null');
   if (!docFileData) { showStatus('⚠️ ファイルを選択してください'); return; }
 
+  clearRegForm();
   console.log('[analyzeDocument] 開始 docFileMimeType=', docFileMimeType, 'データ長=', docFileData.length);
 
   document.getElementById('doc-reading-status').style.display = '';
