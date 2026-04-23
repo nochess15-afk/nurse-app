@@ -15,6 +15,7 @@
 <title>NurseAIDE</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
 <body>
 
@@ -294,14 +295,14 @@
       <!-- 書類から読み込み -->
       <div style="background:#f0f8ff;border:1.5px solid #a8d4ec;border-radius:var(--radius-sm);padding:14px;margin-bottom:16px">
         <div style="font-size:13px;font-weight:700;color:var(--primary);margin-bottom:10px">📄 書類から自動入力</div>
-        <div style="font-size:12px;color:var(--text-secondary);margin-bottom:10px">指示書をカメラで撮影した写真（JPEG）をアップロードすると患者情報を自動で読み取ります</div>
-        <div style="font-size:11px;color:#e65100;margin-bottom:10px">💡 iPhoneのカメラで撮影した写真が最も精度が高いです。PDFは非対応です。</div>
+        <div style="font-size:12px;color:var(--text-secondary);margin-bottom:10px">指示書の写真またはPDFをアップロードすると患者情報を自動で読み取ります</div>
+        <div style="font-size:11px;color:#e65100;margin-bottom:10px">💡 iPhoneのカメラで撮影した写真が最も精度が高いです。PDFも対応しています。</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn btn-secondary btn-sm" onclick="document.getElementById('doc-photo').click()">
-            📷 写真を撮影・選択
+            📷 写真・PDFを選択
           </button>
         </div>
-        <input type="file" id="doc-photo" accept="image/*" style="display:none" onchange="readDocumentFile(this)">
+        <input type="file" id="doc-photo" accept="image/*,application/pdf" style="display:none" onchange="readDocumentFile(this)">
         <div id="doc-preview" style="display:none;margin-top:10px">
           <img id="doc-img" style="max-width:100%;max-height:200px;border-radius:6px;border:1px solid var(--border)">
           <div id="doc-filename" style="font-size:12px;color:var(--text-secondary);margin-top:6px"></div>

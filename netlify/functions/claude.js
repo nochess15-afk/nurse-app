@@ -62,9 +62,6 @@ exports.handler = async function(event, context) {
       'x-api-key': CLAUDE_KEY,
       'anthropic-version': '2023-06-01'
     };
-    if (body.usePdfBeta) {
-      apiHeaders['anthropic-beta'] = 'pdfs-2024-09-25';
-    }
     // DEBUG: サーバー側リクエスト内容ログ
     const msgs = body.messages || [];
     const firstContent = msgs[0] && msgs[0].content ? msgs[0].content : [];

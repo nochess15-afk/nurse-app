@@ -2417,77 +2417,93 @@ function readDocumentFile(input) {
   var file = input.files[0];
   if (!file) return;
 
-  // PDFは拒否
-  if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
-    showStatus('⚠️ PDFは非対応です。指示書はカメラで撮影したJPEG写真でお読み込みください。', 7000);
+  var isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+
+  if (!isPdf && file.type && !file.type.startsWith('image/')) {
+    showStatus('⚠️ 画像またはPDFファイルを選択してください。', 5000);
     input.value = '';
     return;
   }
 
-  // image/* を許可（HEICなど非対応形式はanalyzeDocument内でjpegにフォールバック）
-  if (file.type && !file.type.startsWith('image/')) {
-    showStatus('⚠️ 画像ファイルを選択してください。', 5000);
+  if (file.size > 20 * 1024 * 1024) {
+    showStatus('⚠️ ファイルが大きすぎます。20MB以下のファイルを選択してください。', 5000);
     input.value = '';
     return;
   }
 
-  if (file.size > 10 * 1024 * 1024) {
-    showStatus('⚠️ ファイルが大きすぎます。10MB以下の画像を選択してください。', 5000);
-    input.value = '';
-    return;
+  function showPreview(dataUrl, label) {
+    var preview = document.getElementById('doc-preview');
+    var imgPreview = document.getElementById('doc-img');
+    var filename = document.getElementById('doc-filename');
+    imgPreview.src = dataUrl;
+    imgPreview.style.display = '';
+    filename.textContent = label;
+    preview.style.display = '';
   }
 
-  docFileMimeType = file.type || 'image/jpeg';
-
-  var reader = new FileReader();
-  reader.onload = function(e) {
-    var originalDataUrl = e.target.result;
-    var MAX_SIDE = 2048;
-    var QUALITY = 0.85;
-
-    // Canvasでリサイズ＆JPEG圧縮
-    var imgEl = new Image();
-    imgEl.onload = function() {
-      var w = imgEl.width;
-      var h = imgEl.height;
-      var scale = Math.min(1, MAX_SIDE / Math.max(w, h));
-      var tw = Math.round(w * scale);
-      var th = Math.round(h * scale);
-      var canvas = document.createElement('canvas');
-      canvas.width = tw;
-      canvas.height = th;
-      var ctx = canvas.getContext('2d');
-      ctx.drawImage(imgEl, 0, 0, tw, th);
-      var compressed = canvas.toDataURL('image/jpeg', QUALITY);
-      docFileData = compressed.split(',')[1];
-      docFileMimeType = 'image/jpeg';
-      var origKB = Math.round(originalDataUrl.length * 3 / 4 / 1024);
-      var compKB = Math.round(docFileData.length * 3 / 4 / 1024);
-      console.log('[readDocumentFile] 圧縮完了 元サイズ≈' + origKB + 'KB → 圧縮後≈' + compKB + 'KB (' + tw + 'x' + th + 'px)');
-
-      var preview = document.getElementById('doc-preview');
-      var imgPreview = document.getElementById('doc-img');
-      var filename = document.getElementById('doc-filename');
-      imgPreview.src = compressed;
-      imgPreview.style.display = '';
-      filename.textContent = file.name;
-      preview.style.display = '';
+  if (isPdf) {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var arrayBuffer = e.target.result;
+      var loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+      loadingTask.promise.then(function(pdf) {
+        pdf.getPage(1).then(function(page) {
+          var viewport = page.getViewport({ scale: 2.0 });
+          var canvas = document.createElement('canvas');
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+          var ctx = canvas.getContext('2d');
+          page.render({ canvasContext: ctx, viewport: viewport }).promise.then(function() {
+            var dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+            docFileData = dataUrl.split(',')[1];
+            docFileMimeType = 'image/jpeg';
+            var kb = Math.round(docFileData.length * 3 / 4 / 1024);
+            console.log('[readDocumentFile] PDF→JPEG変換完了 ' + Math.round(viewport.width) + 'x' + Math.round(viewport.height) + 'px ≈' + kb + 'KB');
+            showPreview(dataUrl, file.name);
+          });
+        });
+      }).catch(function(err) {
+        console.error('[readDocumentFile] PDF読み込みエラー:', err);
+        showStatus('⚠️ PDFの読み込みに失敗しました。', 5000);
+      });
     };
-    imgEl.onerror = function() {
-      // 画像として読めない場合は元データをそのまま使用
-      console.warn('[readDocumentFile] Canvas圧縮失敗、元データを使用');
-      docFileData = originalDataUrl.split(',')[1];
-      var preview = document.getElementById('doc-preview');
-      var imgPreview = document.getElementById('doc-img');
-      var filename = document.getElementById('doc-filename');
-      imgPreview.src = originalDataUrl;
-      imgPreview.style.display = '';
-      filename.textContent = file.name;
-      preview.style.display = '';
+    reader.readAsArrayBuffer(file);
+  } else {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var originalDataUrl = e.target.result;
+      var MAX_SIDE = 2048;
+      var QUALITY = 0.85;
+      var imgEl = new Image();
+      imgEl.onload = function() {
+        var w = imgEl.width;
+        var h = imgEl.height;
+        var scale = Math.min(1, MAX_SIDE / Math.max(w, h));
+        var tw = Math.round(w * scale);
+        var th = Math.round(h * scale);
+        var canvas = document.createElement('canvas');
+        canvas.width = tw;
+        canvas.height = th;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(imgEl, 0, 0, tw, th);
+        var compressed = canvas.toDataURL('image/jpeg', QUALITY);
+        docFileData = compressed.split(',')[1];
+        docFileMimeType = 'image/jpeg';
+        var origKB = Math.round(originalDataUrl.length * 3 / 4 / 1024);
+        var compKB = Math.round(docFileData.length * 3 / 4 / 1024);
+        console.log('[readDocumentFile] 圧縮完了 元≈' + origKB + 'KB → ' + compKB + 'KB (' + tw + 'x' + th + 'px)');
+        showPreview(compressed, file.name);
+      };
+      imgEl.onerror = function() {
+        console.warn('[readDocumentFile] Canvas圧縮失敗、元データを使用');
+        docFileData = originalDataUrl.split(',')[1];
+        docFileMimeType = 'image/jpeg';
+        showPreview(originalDataUrl, file.name);
+      };
+      imgEl.src = originalDataUrl;
     };
-    imgEl.src = originalDataUrl;
-  };
-  reader.readAsDataURL(file);
+    reader.readAsDataURL(file);
+  }
 }
 
 async function analyzeDocument() {
@@ -2517,7 +2533,6 @@ async function analyzeDocument() {
       body: JSON.stringify({
         model: CLAUDE_MODEL,
         max_tokens: 1500,
-        usePdfBeta: false,
         system: 'You are reading a Japanese home visit nursing instruction form. Reply only in JSON. No markdown.',
         messages: [{
           role: 'user',
@@ -2525,7 +2540,7 @@ async function analyzeDocument() {
             contentBlock,
             {
               type: 'text',
-              text: 'Read this photo of a Japanese 訪問看護指示書 and extract exactly what is written. Return only this JSON:\n{\n  "name": "kanji name in 患者氏名 field",\n  "furigana": "reading in ふりがな field",\n  "age": "number only",\n  "gender": "男性 or 女性",\n  "diagnosis1": "disease name in 主たる傷病名(1)",\n  "diagnosis2": "disease name in 主たる傷病名(2)",\n  "diagnosis3": "disease name in 主たる傷病名(3)",\n  "adl": "one symbol with handwritten circle in 寝たきり度: J1/J2/A1/A2/B1/B2/C1/C2",\n  "dementia": "one symbol with handwritten circle in 認知症の状況: Ⅰ/Ⅱa/Ⅱb/Ⅲa/Ⅲb/Ⅳ/M",\n  "medicines": "only handwritten drug names and dosages, one per line. 銭/钱/鏡→錠. Exclude any printed text.",\n  "notes": "handwritten text in 療養生活指導上の留意事項",\n  "rehabilitation": "only handwritten numbers and circled items in リハビリ section",\n  "history": ""\n}'
+              text: 'Read this photo of a Japanese 訪問看護指示書 and extract exactly what is handwritten. Return only this JSON:\n{\n  "name": "kanji name in 患者氏名 field",\n  "furigana": "reading in ふりがな field",\n  "age": "number only",\n  "gender": "男性 or 女性",\n  "diagnosis1": "disease name in 主たる傷病名(1)",\n  "diagnosis2": "disease name in 主たる傷病名(2)",\n  "diagnosis3": "disease name in 主たる傷病名(3)",\n  "adl": "only the ONE symbol with handwritten circle ○ in 寝たきり度 row: J1/J2/A1/A2/B1/B2/C1/C2",\n  "dementia": "only the ONE symbol with handwritten circle ○ in 認知症の状況 row: Ⅰ/Ⅱa/Ⅱb/Ⅲa/Ⅲb/Ⅳ/M",\n  "medicines": "only handwritten drug names and dosages in 投与中の薬剤 fields, one per line. Replace 銭/钱/鏡 with 錠. Exclude ALL printed text, notes, and explanations.",\n  "notes": "handwritten text in 療養生活指導上の留意事項 only",\n  "rehabilitation": "only handwritten numbers and circled 可/不可 items in リハビリ section. Do not include printed template text.",\n  "history": ""\n}'
             }
           ]
         }]
@@ -4640,6 +4655,10 @@ ${visitText || '記録なし'}`
 
 // ===== 初期化 =====
 document.addEventListener('DOMContentLoaded', function() {
+  // ===== PDF.js workerSrc設定 =====
+  if (typeof pdfjsLib !== 'undefined') {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
   // ===== バージョンチェック・自動更新 =====
   var currentVersion = '202604121000';
   try {
