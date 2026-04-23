@@ -2527,10 +2527,15 @@ async function analyzeDocument() {
     var contentBlock = { type: 'image', source: { type: 'base64', media_type: mediaType, data: docFileData } };
     console.log('[analyzeDocument] 画像送信 media_type=', mediaType, 'base64長=', docFileData.length);
     console.log('[analyzeDocument] fetchを開始します Supabase Edge Function');
+    console.log('[送信画像] base64先頭50文字:', docFileData.substring(0, 50));
 
     var response = await fetch('https://cktxrkkeqdazcvamphhh.supabase.co/functions/v1/clude', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache, no-store',
+        'Pragma': 'no-cache'
+      },
       body: JSON.stringify({
         model: CLAUDE_MODEL,
         max_tokens: 1500,
