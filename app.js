@@ -2434,6 +2434,8 @@ function readDocumentFile(input) {
   var file = input.files[0];
   if (!file) return;
 
+  console.log('[readDocumentFile] file.name=', file.name, 'file.type=', file.type, 'file.size=', file.size);
+
   var isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
 
   if (!isPdf && file.type && !file.type.startsWith('image/')) {
@@ -2452,12 +2454,14 @@ function readDocumentFile(input) {
   docChatFileName = file.name;
   var reader = new FileReader();
   reader.onload = function(e) {
+    console.log('[FileReader.onload] result length=', e.target.result ? e.target.result.length : 'null');
     docChatFileData = e.target.result.split(',')[1];
     docChatFileMime = file.type || 'image/jpeg';
     console.log('[readDocumentFile] 読み込み完了 ≈' + Math.round(docChatFileData.length * 3 / 4 / 1024) + 'KB mime=' + docChatFileMime);
     document.getElementById('doc-attach-label').textContent = file.name + ' ✅';
   };
   reader.onerror = function() {
+    console.log('[FileReader.onerror] error=', reader.error);
     console.error('[readDocumentFile] FileReaderエラー');
     docChatAddMessage('ai', '⚠️ 画像の読み込みに失敗しました。別の写真を選択してください。');
     docChatFileData = null;
