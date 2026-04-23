@@ -2441,16 +2441,51 @@ function readDocumentFile(input) {
 
   var reader = new FileReader();
   reader.onload = function(e) {
-    // canvas・リサイズ・圧縮なし。readAsDataURLの結果をそのまま使用
-    docFileData = e.target.result.split(',')[1];
-    console.log('[readDocumentFile] base64変換完了 サイズ=', docFileData.length, 'chars (約', Math.round(docFileData.length * 3 / 4 / 1024), 'KB) type=', docFileMimeType);
-    var preview = document.getElementById('doc-preview');
-    var img = document.getElementById('doc-img');
-    var filename = document.getElementById('doc-filename');
-    img.src = e.target.result;
-    img.style.display = '';
-    filename.textContent = file.name;
-    preview.style.display = '';
+    var originalDataUrl = e.target.result;
+    var MAX_SIDE = 2048;
+    var QUALITY = 0.85;
+
+    // Canvasでリサイズ＆JPEG圧縮
+    var imgEl = new Image();
+    imgEl.onload = function() {
+      var w = imgEl.width;
+      var h = imgEl.height;
+      var scale = Math.min(1, MAX_SIDE / Math.max(w, h));
+      var tw = Math.round(w * scale);
+      var th = Math.round(h * scale);
+      var canvas = document.createElement('canvas');
+      canvas.width = tw;
+      canvas.height = th;
+      var ctx = canvas.getContext('2d');
+      ctx.drawImage(imgEl, 0, 0, tw, th);
+      var compressed = canvas.toDataURL('image/jpeg', QUALITY);
+      docFileData = compressed.split(',')[1];
+      docFileMimeType = 'image/jpeg';
+      var origKB = Math.round(originalDataUrl.length * 3 / 4 / 1024);
+      var compKB = Math.round(docFileData.length * 3 / 4 / 1024);
+      console.log('[readDocumentFile] 圧縮完了 元サイズ≈' + origKB + 'KB → 圧縮後≈' + compKB + 'KB (' + tw + 'x' + th + 'px)');
+
+      var preview = document.getElementById('doc-preview');
+      var imgPreview = document.getElementById('doc-img');
+      var filename = document.getElementById('doc-filename');
+      imgPreview.src = compressed;
+      imgPreview.style.display = '';
+      filename.textContent = file.name;
+      preview.style.display = '';
+    };
+    imgEl.onerror = function() {
+      // 画像として読めない場合は元データをそのまま使用
+      console.warn('[readDocumentFile] Canvas圧縮失敗、元データを使用');
+      docFileData = originalDataUrl.split(',')[1];
+      var preview = document.getElementById('doc-preview');
+      var imgPreview = document.getElementById('doc-img');
+      var filename = document.getElementById('doc-filename');
+      imgPreview.src = originalDataUrl;
+      imgPreview.style.display = '';
+      filename.textContent = file.name;
+      preview.style.display = '';
+    };
+    imgEl.src = originalDataUrl;
   };
   reader.readAsDataURL(file);
 }
