@@ -2546,7 +2546,7 @@ async function analyzeDocument() {
             contentBlock,
             {
               type: 'text',
-              text: 'Read this photo of a Japanese 訪問看護指示書 and extract exactly what is handwritten. Return only this JSON:\n{\n  "name": "kanji name in 患者氏名 field",\n  "furigana": "reading in ふりがな field",\n  "age": "number only",\n  "gender": "男性 or 女性",\n  "diagnosis1": "disease name in 主たる傷病名(1)",\n  "diagnosis2": "disease name in 主たる傷病名(2)",\n  "diagnosis3": "disease name in 主たる傷病名(3)",\n  "adl": "only the ONE symbol with handwritten circle ○ in 寝たきり度 row: J1/J2/A1/A2/B1/B2/C1/C2",\n  "dementia": "only the ONE symbol with handwritten circle ○ in 認知症の状況 row: Ⅰ/Ⅱa/Ⅱb/Ⅲa/Ⅲb/Ⅳ/M",\n  "medicines": "only handwritten drug names and dosages in 投与中の薬剤 fields, one per line. Replace 銭/钱/鏡 with 錠. Exclude ALL printed text, notes, and explanations.",\n  "notes": "handwritten text in 療養生活指導上の留意事項 only",\n  "rehabilitation": "only handwritten numbers and circled 可/不可 items in リハビリ section. Do not include printed template text.",\n  "history": ""\n}'
+              text: 'Read this photo carefully. Extract only what is handwritten or filled in. Return JSON:\n{"name":"kanji name in 患者氏名","furigana":"ふりがな","age":"number","gender":"男性 or 女性","diagnosis1":"傷病名(1)","diagnosis2":"傷病名(2)","diagnosis3":"傷病名(3)","adl":"circle mark in 寝たきり度 J1/J2/A1/A2/B1/B2/C1/C2","dementia":"circle mark in 認知症 Ⅰ/Ⅱa/Ⅱb/Ⅲa/Ⅲb/Ⅳ/M","medicines":"handwritten drugs only, one per line","notes":"handwritten text in 留意事項","rehabilitation":"handwritten numbers and checked items only","history":""}'
             }
           ]
         }]
