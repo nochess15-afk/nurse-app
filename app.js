@@ -2409,9 +2409,26 @@ async function savePatientOnly() {
   }
 }
 
-// ===== 書類から患者情報読み取り =====
+// ===== 書類から患者情報読み取り（チャット方式） =====
 var docFileData = null;
 var docFileMimeType = null;
+var docFileName = null;
+
+function docChatAddMessage(role, html) {
+  var area = document.getElementById('doc-chat-messages');
+  var wrap = document.createElement('div');
+  wrap.style.cssText = 'display:flex;' + (role === 'user' ? 'justify-content:flex-end' : 'justify-content:flex-start');
+  var bubble = document.createElement('div');
+  bubble.style.cssText = 'max-width:88%;padding:8px 12px;border-radius:12px;font-size:13px;line-height:1.6;word-break:break-word;' +
+    (role === 'user'
+      ? 'background:#0056b3;color:white;border-bottom-right-radius:3px'
+      : 'background:white;border:1px solid var(--border);color:var(--text);border-bottom-left-radius:3px');
+  bubble.innerHTML = html;
+  wrap.appendChild(bubble);
+  area.appendChild(wrap);
+  area.scrollTop = area.scrollHeight;
+  return wrap;
+}
 
 function readDocumentFile(input) {
   var file = input.files[0];
@@ -2420,122 +2437,86 @@ function readDocumentFile(input) {
   var isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
 
   if (!isPdf && file.type && !file.type.startsWith('image/')) {
-    showStatus('⚠️ 画像またはPDFファイルを選択してください。', 5000);
+    docChatAddMessage('ai', '⚠️ 画像またはPDFファイルを選択してください。');
     input.value = '';
     return;
   }
 
-  if (file.size > 20 * 1024 * 1024) {
-    showStatus('⚠️ ファイルが大きすぎます。20MB以下のファイルを選択してください。', 5000);
+  if (file.size > 6 * 1024 * 1024) {
+    var mb = Math.round(file.size / 1024 / 1024 * 10) / 10;
+    docChatAddMessage('ai', '⚠️ ファイルが大きすぎます（' + mb + 'MB）。写真を撮り直すか圧縮してください。');
     input.value = '';
     return;
   }
 
-  function showPreview(dataUrl, label) {
-    var preview = document.getElementById('doc-preview');
-    var imgPreview = document.getElementById('doc-img');
-    var filename = document.getElementById('doc-filename');
-    imgPreview.src = dataUrl;
-    imgPreview.style.display = '';
-    filename.textContent = label;
-    preview.style.display = '';
-  }
+  docFileName = file.name;
+  document.getElementById('doc-attach-label').textContent = file.name;
 
   if (isPdf) {
     var reader = new FileReader();
     reader.onload = function(e) {
-      var arrayBuffer = e.target.result;
-      var loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+      var loadingTask = pdfjsLib.getDocument({ data: e.target.result });
       loadingTask.promise.then(function(pdf) {
         pdf.getPage(1).then(function(page) {
           var viewport = page.getViewport({ scale: 2.0 });
           var canvas = document.createElement('canvas');
           canvas.width = viewport.width;
           canvas.height = viewport.height;
-          var ctx = canvas.getContext('2d');
-          page.render({ canvasContext: ctx, viewport: viewport }).promise.then(function() {
+          page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport }).promise.then(function() {
             var dataUrl = canvas.toDataURL('image/jpeg', 0.85);
             docFileData = dataUrl.split(',')[1];
             docFileMimeType = 'image/jpeg';
-            var kb = Math.round(docFileData.length * 3 / 4 / 1024);
-            console.log('[readDocumentFile] PDF→JPEG変換完了 ' + Math.round(viewport.width) + 'x' + Math.round(viewport.height) + 'px ≈' + kb + 'KB');
-            showPreview(dataUrl, file.name);
+            console.log('[readDocumentFile] PDF→JPEG完了 ' + Math.round(docFileData.length * 3 / 4 / 1024) + 'KB');
           });
         });
       }).catch(function(err) {
         console.error('[readDocumentFile] PDF読み込みエラー:', err);
-        showStatus('⚠️ PDFの読み込みに失敗しました。', 5000);
+        docChatAddMessage('ai', '⚠️ PDFの読み込みに失敗しました。');
       });
     };
     reader.readAsArrayBuffer(file);
   } else {
     var reader = new FileReader();
     reader.onload = function(e) {
-      var originalDataUrl = e.target.result;
-      var MAX_SIDE = 2048;
-      var QUALITY = 0.85;
-      var imgEl = new Image();
-      imgEl.onload = function() {
-        var w = imgEl.width;
-        var h = imgEl.height;
-        var scale = Math.min(1, MAX_SIDE / Math.max(w, h));
-        var tw = Math.round(w * scale);
-        var th = Math.round(h * scale);
-        var canvas = document.createElement('canvas');
-        canvas.width = tw;
-        canvas.height = th;
-        var ctx = canvas.getContext('2d');
-        ctx.drawImage(imgEl, 0, 0, tw, th);
-        var compressed = canvas.toDataURL('image/jpeg', QUALITY);
-        docFileData = compressed.split(',')[1];
-        docFileMimeType = 'image/jpeg';
-        var origKB = Math.round(originalDataUrl.length * 3 / 4 / 1024);
-        var compKB = Math.round(docFileData.length * 3 / 4 / 1024);
-        console.log('[readDocumentFile] 圧縮完了 元≈' + origKB + 'KB → ' + compKB + 'KB (' + tw + 'x' + th + 'px)');
-        showPreview(compressed, file.name);
-      };
-      imgEl.onerror = function() {
-        console.warn('[readDocumentFile] Canvas圧縮失敗、元データを使用');
-        docFileData = originalDataUrl.split(',')[1];
-        docFileMimeType = 'image/jpeg';
-        showPreview(originalDataUrl, file.name);
-      };
-      imgEl.src = originalDataUrl;
+      var dataUrl = e.target.result;
+      docFileData = dataUrl.split(',')[1];
+      var supported = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+      docFileMimeType = supported.includes(file.type) ? file.type : 'image/jpeg';
+      console.log('[readDocumentFile] 画像読み込み完了 ≈' + Math.round(docFileData.length * 3 / 4 / 1024) + 'KB');
     };
     reader.readAsDataURL(file);
   }
 }
 
 async function analyzeDocument() {
-  console.log('[analyzeDocument] 呼び出し docFileData=', docFileData ? '有り(' + docFileData.length + 'chars)' : 'null');
-  if (!docFileData) { showStatus('⚠️ ファイルを選択してください'); return; }
+  if (!docFileData) {
+    docChatAddMessage('ai', '⚠️ 先に写真またはPDFを添付してください。');
+    return;
+  }
+
+  docChatAddMessage('user', '📎 ' + (docFileName || '指示書'));
+  document.getElementById('doc-attach-label').textContent = '写真またはPDFを添付してください';
+  document.getElementById('doc-photo').value = '';
+
+  var sendData = docFileData;
+  var sendMime = docFileMimeType;
+  docFileData = null;
+  docFileMimeType = null;
+  docFileName = null;
+
+  var area = document.getElementById('doc-chat-messages');
+  var loadWrap = document.createElement('div');
+  loadWrap.style.cssText = 'display:flex;justify-content:flex-start';
+  loadWrap.innerHTML = '<div style="background:white;border:1px solid var(--border);border-radius:12px;border-bottom-left-radius:3px;padding:8px 12px;font-size:13px;color:var(--text-secondary)"><span class="loading-dot"><span></span><span></span><span></span></span> 読み取り中...</div>';
+  area.appendChild(loadWrap);
+  area.scrollTop = area.scrollHeight;
 
   clearRegForm();
-  console.log('[analyzeDocument] 開始 docFileMimeType=', docFileMimeType, 'データ長=', docFileData.length);
-
-  document.getElementById('doc-reading-status').style.display = '';
-  document.getElementById('doc-preview').style.display = 'none';
 
   try {
-    var mediaType = docFileMimeType || 'image/jpeg';
-    // Claude API対応形式に正規化（HEICなど非対応はjpegで送信）
-    var supported = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-    if (!supported.includes(mediaType)) {
-      console.warn('[analyzeDocument] 非対応MIME型:', mediaType, '→ image/jpeg に変換');
-      mediaType = 'image/jpeg';
-    }
-    var contentBlock = { type: 'image', source: { type: 'base64', media_type: mediaType, data: docFileData } };
-    console.log('[analyzeDocument] 画像送信 media_type=', mediaType, 'base64長=', docFileData.length);
-    console.log('[analyzeDocument] fetchを開始します Supabase Edge Function');
-    console.log('[送信画像] base64先頭50文字:', docFileData.substring(0, 50));
-
     var response = await fetch('/.netlify/functions/claude', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache, no-store',
-        'Pragma': 'no-cache'
-      },
+      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache, no-store', 'Pragma': 'no-cache' },
       body: JSON.stringify({
         model: CLAUDE_MODEL,
         max_tokens: 1500,
@@ -2543,57 +2524,44 @@ async function analyzeDocument() {
         messages: [{
           role: 'user',
           content: [
-            contentBlock,
-            {
-              type: 'text',
-              text: 'Read this photo carefully. Extract only what is handwritten or filled in. Return JSON:\n{"name":"kanji name in 患者氏名","furigana":"ふりがな","age":"number","gender":"男性 or 女性","diagnosis1":"傷病名(1)","diagnosis2":"傷病名(2)","diagnosis3":"傷病名(3)","adl":"circle mark in 寝たきり度 J1/J2/A1/A2/B1/B2/C1/C2","dementia":"circle mark in 認知症 Ⅰ/Ⅱa/Ⅱb/Ⅲa/Ⅲb/Ⅳ/M","medicines":"handwritten drugs only, one per line","notes":"handwritten text in 留意事項","rehabilitation":"handwritten numbers and checked items only","history":""}'
-            }
+            { type: 'image', source: { type: 'base64', media_type: sendMime, data: sendData } },
+            { type: 'text', text: 'Read this photo carefully. Extract only what is handwritten or filled in. Return JSON:\n{"name":"kanji name in 患者氏名","furigana":"ふりがな","age":"number","gender":"男性 or 女性","diagnosis1":"傷病名(1)","diagnosis2":"傷病名(2)","diagnosis3":"傷病名(3)","adl":"circle mark in 寝たきり度 J1/J2/A1/A2/B1/B2/C1/C2","dementia":"circle mark in 認知症 Ⅰ/Ⅱa/Ⅱb/Ⅲa/Ⅲb/Ⅳ/M","medicines":"handwritten drugs only, one per line","notes":"handwritten text in 留意事項","rehabilitation":"handwritten numbers and checked items only","history":""}' }
           ]
         }]
       })
     });
 
-    console.log('[analyzeDocument] APIレスポンス status=', response.status);
+    loadWrap.remove();
     var data = await response.json();
 
-    // APIエラーチェック
     if (!response.ok || data.error) {
-      var errMsg = data.error?.message || '';
-      console.error('[analyzeDocument] APIエラー:', errMsg || response.status, data);
+      var errMsg = (data.error && data.error.message) ? data.error.message : String(response.status);
       if (errMsg.includes('rate limit') || errMsg.includes('tokens per minute')) {
-        throw new Error('アクセスが集中しています。少し待ってから再度お試しください（1分後）');
+        docChatAddMessage('ai', '⚠️ アクセスが集中しています。少し待ってから再度お試しください。');
+      } else {
+        docChatAddMessage('ai', '⚠️ APIエラー: ' + errMsg);
       }
-      throw new Error('APIエラー: ' + (errMsg || response.status));
-    }
-    if (!data.content || !data.content[0] || !data.content[0].text) {
-      console.error('[analyzeDocument] レスポンスにcontentなし:', data);
-      throw new Error('AIからの応答が空です。PDFが複数ページある場合は、1〜2ページ目だけのPDFにしてから再度お試しください。');
-    }
-
-    var result = data.content[0].text;
-    console.log('[analyzeDocument] AIレスポンス raw:', result);
-
-    var parsed = null;
-    var cleanResult = result.replace(/```json|```/g, '').trim();
-    var jsonMatch = cleanResult.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      try {
-        parsed = JSON.parse(jsonMatch[0]);
-        console.log('[analyzeDocument] JSONパース成功:', parsed);
-      } catch(e) {
-        console.error('[analyzeDocument] JSONパース失敗:', e, '\n対象:', jsonMatch[0]);
-      }
-    } else {
-      console.error('[analyzeDocument] JSONブロックが見つかりません。レスポンス:', result);
-    }
-
-    if (!parsed) {
-      showStatus('⚠️ 書類の自動入力に失敗しました。画像を確認して再度お試しください。', 6000);
-      docFileData = null;
       return;
     }
 
-    // 薬剤名をAIで正規化（失敗時は元テキストをそのまま使用）
+    if (!data.content || !data.content[0] || !data.content[0].text) {
+      docChatAddMessage('ai', '⚠️ AIからの応答が空でした。もう一度お試しください。');
+      return;
+    }
+
+    var result = data.content[0].text;
+    var parsed = null;
+    var jsonMatch = result.replace(/```json|```/g, '').trim().match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      try { parsed = JSON.parse(jsonMatch[0]); } catch(e) { console.error('[analyzeDocument] JSONパース失敗:', e); }
+    }
+
+    if (!parsed) {
+      docChatAddMessage('ai', '⚠️ 読み取りに失敗しました。写真を確認して再度お試しください。');
+      return;
+    }
+
+    // 薬剤名正規化（失敗時は元テキストをそのまま使用）
     var normalizedMedicines = parsed.medicines || '';
     if (parsed.medicines) {
       try {
@@ -2604,55 +2572,56 @@ async function analyzeDocument() {
         var medJson = medRaw.trim().replace(/^```[a-z]*\n?/, '').replace(/\n?```$/, '');
         var medResult = JSON.parse(medJson);
         if (medResult.medicines) normalizedMedicines = medResult.medicines;
-        console.log('[analyzeDocument] 薬剤名正規化完了');
-      } catch(e) {
-        console.warn('[analyzeDocument] 薬剤名正規化失敗（元テキストを使用）:', e);
-      }
+      } catch(e) { console.warn('[analyzeDocument] 薬剤名正規化失敗:', e); }
     }
 
-    // 確認モーダルに結果を格納して表示
     window._docParsed = parsed;
     window._docNormalizedMedicines = normalizedMedicines;
-    document.getElementById('doc-confirm-name').value = parsed.name || '';
-    document.getElementById('doc-confirm-diagnosis').value = parsed.diagnosis1 || '';
-    document.getElementById('doc-confirm-age').value = String(parsed.age || '').replace(/[^0-9]/g, '');
-    document.getElementById('doc-confirm-modal').style.display = 'flex';
-    docFileData = null;
-    showStatus('✅ 書類を読み取りました。氏名・病名を確認してください');
+
+    var lines = [];
+    if (parsed.name)           lines.push('氏名：' + parsed.name);
+    if (parsed.furigana)       lines.push('ふりがな：' + parsed.furigana);
+    if (parsed.age)            lines.push('年齢：' + parsed.age + '歳');
+    if (parsed.gender)         lines.push('性別：' + parsed.gender);
+    if (parsed.diagnosis1)     lines.push('傷病名①：' + parsed.diagnosis1);
+    if (parsed.diagnosis2)     lines.push('傷病名②：' + parsed.diagnosis2);
+    if (parsed.diagnosis3)     lines.push('傷病名③：' + parsed.diagnosis3);
+    if (parsed.adl)            lines.push('寝たきり度：' + parsed.adl);
+    if (parsed.dementia)       lines.push('認知症：' + parsed.dementia);
+    if (normalizedMedicines)   lines.push('薬剤：' + normalizedMedicines.split('\n').filter(Boolean).join('、'));
+    if (parsed.notes)          lines.push('留意事項：' + parsed.notes);
+    if (parsed.rehabilitation) lines.push('リハビリ：' + parsed.rehabilitation);
+
+    var summaryHtml = '以下の内容で読み取りました。確認してください：<br><br>' +
+      lines.map(function(l) { return '<span style="display:block">' + l + '</span>'; }).join('') +
+      '<br><button onclick="docChatApplyForm()" style="background:var(--primary);color:white;border:none;border-radius:8px;padding:8px 16px;font-size:13px;cursor:pointer;width:100%;margin-top:4px">📝 フォームに入力する</button>';
+    docChatAddMessage('ai', summaryHtml);
 
   } catch(e) {
+    loadWrap.remove();
     console.error('[analyzeDocument] エラー:', e);
-    showStatus('⚠️ 読み取りに失敗しました: ' + e.message, 5000);
-  } finally {
-    document.getElementById('doc-reading-status').style.display = 'none';
-    document.getElementById('doc-preview').style.display = '';
+    docChatAddMessage('ai', '⚠️ 読み取りに失敗しました: ' + e.message);
   }
 }
 
-
-function confirmDocForm() {
+function docChatApplyForm() {
   var parsed = window._docParsed || {};
   var normalizedMedicines = window._docNormalizedMedicines || '';
-  document.getElementById('doc-confirm-modal').style.display = 'none';
 
-  var confirmedName = document.getElementById('doc-confirm-name').value.trim();
-  var confirmedDiagnosis = document.getElementById('doc-confirm-diagnosis').value.trim();
-  var confirmedAge = document.getElementById('doc-confirm-age').value.trim();
-
-  if (confirmedName)  document.getElementById('reg-name').value = confirmedName;
-  document.getElementById('reg-furigana').value = parsed.furigana || '';
-  if (confirmedAge)   document.getElementById('reg-age').value = confirmedAge;
-  if (parsed.gender)  document.getElementById('reg-gender').value = parsed.gender;
-  document.getElementById('reg-diagnosis1').value = confirmedDiagnosis || parsed.diagnosis1 || '';
+  if (parsed.name)        document.getElementById('reg-name').value = parsed.name;
+  if (parsed.furigana)    document.getElementById('reg-furigana').value = parsed.furigana;
+  if (parsed.age)         document.getElementById('reg-age').value = String(parsed.age).replace(/[^0-9]/g, '');
+  if (parsed.gender)      document.getElementById('reg-gender').value = parsed.gender;
+  document.getElementById('reg-diagnosis1').value = parsed.diagnosis1 || '';
   document.getElementById('reg-diagnosis2').value = parsed.diagnosis2 || '';
   document.getElementById('reg-diagnosis3').value = parsed.diagnosis3 || '';
-  if (parsed.adl)     setDegreeBtn('reg-adl-degree', parsed.adl);
-  if (parsed.dementia) setDegreeBtn('reg-dementia', parsed.dementia);
-  if (parsed.notes)   document.getElementById('reg-notes').value = parsed.notes;
+  if (parsed.adl)         setDegreeBtn('reg-adl-degree', parsed.adl);
+  if (parsed.dementia)    setDegreeBtn('reg-dementia', parsed.dementia);
+  if (parsed.notes)       document.getElementById('reg-notes').value = parsed.notes;
   if (parsed.rehabilitation) document.getElementById('reg-rehabilitation').value = parsed.rehabilitation;
   if (normalizedMedicines) renderMedicineRows('reg-medicines-rows', normalizedMedicines);
 
-  console.log('[confirmDocForm] フォームセット完了');
+  docChatAddMessage('ai', '✅ フォームに入力しました。内容を確認して保存してください。');
   showStatus('✅ 患者情報を入力しました。内容を確認して保存してください');
 }
 
