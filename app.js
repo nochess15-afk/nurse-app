@@ -2525,9 +2525,9 @@ async function analyzeDocument() {
     }
     var contentBlock = { type: 'image', source: { type: 'base64', media_type: mediaType, data: docFileData } };
     console.log('[analyzeDocument] 画像送信 media_type=', mediaType, 'base64長=', docFileData.length);
-    console.log('[analyzeDocument] fetchを開始します /.netlify/functions/claude');
+    console.log('[analyzeDocument] fetchを開始します Supabase Edge Function');
 
-    var response = await fetch('/.netlify/functions/claude', {
+    var response = await fetch('https://cktxrkkeqdazcvamphhh.supabase.co/functions/v1/claude', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
