@@ -2453,44 +2453,75 @@ function readDocumentFile(input) {
   document.getElementById('doc-attach-label').textContent = file.name;
 
   if (isPdf) {
+    if (typeof pdfjsLib === 'undefined') {
+      docChatAddMessage('ai', '⚠️ PDF読み込みライブラリの読み込みに失敗しています。ページを再読み込みしてください。');
+      input.value = '';
+      return;
+    }
     var reader = new FileReader();
     reader.onload = function(e) {
       var loadingTask = pdfjsLib.getDocument({ data: e.target.result });
       loadingTask.promise.then(function(pdf) {
-        pdf.getPage(1).then(function(page) {
+        return pdf.getPage(1).then(function(page) {
           var viewport = page.getViewport({ scale: 2.0 });
           var canvas = document.createElement('canvas');
           canvas.width = viewport.width;
           canvas.height = viewport.height;
-          page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport }).promise.then(function() {
+          return page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport }).promise.then(function() {
             var dataUrl = canvas.toDataURL('image/jpeg', 0.85);
             docFileData = dataUrl.split(',')[1];
             docFileMimeType = 'image/jpeg';
             console.log('[readDocumentFile] PDF→JPEG完了 ' + Math.round(docFileData.length * 3 / 4 / 1024) + 'KB');
+            document.getElementById('doc-attach-label').textContent = file.name + ' ✅';
           });
         });
       }).catch(function(err) {
         console.error('[readDocumentFile] PDF読み込みエラー:', err);
-        docChatAddMessage('ai', '⚠️ PDFの読み込みに失敗しました。');
+        docChatAddMessage('ai', '⚠️ PDFの読み込みに失敗しました: ' + err.message);
+        docFileData = null;
+        input.value = '';
       });
+    };
+    reader.onerror = function(e) {
+      console.error('[readDocumentFile] FileReader(PDF)エラー:', e);
+      docChatAddMessage('ai', '⚠️ ファイルの読み込みに失敗しました。もう一度選択してください。');
+      docFileData = null;
+      input.value = '';
     };
     reader.readAsArrayBuffer(file);
   } else {
     var reader = new FileReader();
     reader.onload = function(e) {
       var dataUrl = e.target.result;
+      if (!dataUrl || !dataUrl.includes(',')) {
+        docChatAddMessage('ai', '⚠️ ファイルの読み込みに失敗しました。もう一度選択してください。');
+        input.value = '';
+        return;
+      }
       docFileData = dataUrl.split(',')[1];
       var supported = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
       docFileMimeType = supported.includes(file.type) ? file.type : 'image/jpeg';
-      console.log('[readDocumentFile] 画像読み込み完了 ≈' + Math.round(docFileData.length * 3 / 4 / 1024) + 'KB');
+      console.log('[readDocumentFile] 画像読み込み完了 ≈' + Math.round(docFileData.length * 3 / 4 / 1024) + 'KB mime=' + docFileMimeType);
+      document.getElementById('doc-attach-label').textContent = file.name + ' ✅';
+    };
+    reader.onerror = function(e) {
+      console.error('[readDocumentFile] FileReader(画像)エラー:', e);
+      docChatAddMessage('ai', '⚠️ ファイルの読み込みに失敗しました。もう一度選択してください。');
+      docFileData = null;
+      input.value = '';
     };
     reader.readAsDataURL(file);
   }
 }
 
 async function analyzeDocument() {
-  if (!docFileData) {
-    docChatAddMessage('ai', '⚠️ 先に写真またはPDFを添付してください。');
+  if (!docFileData || docFileData.length === 0) {
+    var label = document.getElementById('doc-attach-label').textContent;
+    if (label && label !== '写真またはPDFを添付してください' && !label.includes('✅')) {
+      docChatAddMessage('ai', '⚠️ ファイルを読み込み中です。少し待ってから送信してください。');
+    } else {
+      docChatAddMessage('ai', '⚠️ 先に写真またはPDFを添付してください。');
+    }
     return;
   }
 
