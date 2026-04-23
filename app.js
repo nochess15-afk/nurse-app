@@ -2490,27 +2490,35 @@ function readDocumentFile(input) {
     };
     reader.readAsArrayBuffer(file);
   } else {
-    var reader = new FileReader();
-    reader.onload = function(e) {
-      var dataUrl = e.target.result;
-      if (!dataUrl || !dataUrl.includes(',')) {
-        docChatAddMessage('ai', '⚠️ ファイルの読み込みに失敗しました。もう一度選択してください。');
+    var objectUrl = URL.createObjectURL(file);
+    var imgEl = new Image();
+    imgEl.onload = function() {
+      URL.revokeObjectURL(objectUrl);
+      try {
+        var canvas = document.createElement('canvas');
+        canvas.width = imgEl.width;
+        canvas.height = imgEl.height;
+        canvas.getContext('2d').drawImage(imgEl, 0, 0);
+        var dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        docFileData = dataUrl.split(',')[1];
+        docFileMimeType = 'image/jpeg';
+        console.log('[readDocumentFile] 画像→JPEG変換完了 ≈' + Math.round(docFileData.length * 3 / 4 / 1024) + 'KB');
+        document.getElementById('doc-attach-label').textContent = file.name + ' ✅';
+      } catch(err) {
+        console.error('[readDocumentFile] Canvas変換エラー:', err);
+        docChatAddMessage('ai', '⚠️ 画像の読み込みに失敗しました。別の写真を選択してください。');
+        docFileData = null;
         input.value = '';
-        return;
       }
-      docFileData = dataUrl.split(',')[1];
-      var supported = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-      docFileMimeType = supported.includes(file.type) ? file.type : 'image/jpeg';
-      console.log('[readDocumentFile] 画像読み込み完了 ≈' + Math.round(docFileData.length * 3 / 4 / 1024) + 'KB mime=' + docFileMimeType);
-      document.getElementById('doc-attach-label').textContent = file.name + ' ✅';
     };
-    reader.onerror = function(e) {
-      console.error('[readDocumentFile] FileReader(画像)エラー:', e);
-      docChatAddMessage('ai', '⚠️ ファイルの読み込みに失敗しました。もう一度選択してください。');
+    imgEl.onerror = function() {
+      URL.revokeObjectURL(objectUrl);
+      console.error('[readDocumentFile] Image読み込みエラー');
+      docChatAddMessage('ai', '⚠️ 画像の読み込みに失敗しました。別の写真を選択してください。');
       docFileData = null;
       input.value = '';
     };
-    reader.readAsDataURL(file);
+    imgEl.src = objectUrl;
   }
 }
 
