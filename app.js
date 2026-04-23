@@ -2529,7 +2529,7 @@ async function analyzeDocument() {
     console.log('[analyzeDocument] fetchを開始します Supabase Edge Function');
     console.log('[送信画像] base64先頭50文字:', docFileData.substring(0, 50));
 
-    var response = await fetch('https://cktxrkkeqdazcvamphhh.supabase.co/functions/v1/clude', {
+    var response = await fetch('/.netlify/functions/claude', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
