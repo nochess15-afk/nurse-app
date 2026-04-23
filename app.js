@@ -2441,7 +2441,9 @@ function readDocumentFile(input) {
 
   var reader = new FileReader();
   reader.onload = function(e) {
+    // canvas・リサイズ・圧縮なし。readAsDataURLの結果をそのまま使用
     docFileData = e.target.result.split(',')[1];
+    console.log('[readDocumentFile] base64変換完了 サイズ=', docFileData.length, 'chars (約', Math.round(docFileData.length * 3 / 4 / 1024), 'KB) type=', docFileMimeType);
     var preview = document.getElementById('doc-preview');
     var img = document.getElementById('doc-img');
     var filename = document.getElementById('doc-filename');
