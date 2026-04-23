@@ -2527,7 +2527,7 @@ async function analyzeDocument() {
     console.log('[analyzeDocument] 画像送信 media_type=', mediaType, 'base64長=', docFileData.length);
     console.log('[analyzeDocument] fetchを開始します Supabase Edge Function');
 
-    var response = await fetch('https://cktxrkkeqdazcvamphhh.supabase.co/functions/v1/claude', {
+    var response = await fetch('https://cktxrkkeqdazcvamphhh.supabase.co/functions/v1/clude', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
