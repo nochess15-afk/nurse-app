@@ -2410,9 +2410,7 @@ async function savePatientOnly() {
 }
 
 // ===== 書類から患者情報読み取り（チャット方式） =====
-var docFileData = null;
-var docFileMimeType = null;
-var docFileName = null;
+var docChatFile = null;
 
 function docChatAddMessage(role, html) {
   var area = document.getElementById('doc-chat-messages');
@@ -2449,99 +2447,41 @@ function readDocumentFile(input) {
     return;
   }
 
-  docFileName = file.name;
-  document.getElementById('doc-attach-label').textContent = file.name;
-
-  if (isPdf) {
-    if (typeof pdfjsLib === 'undefined') {
-      docChatAddMessage('ai', '⚠️ PDF読み込みライブラリの読み込みに失敗しています。ページを再読み込みしてください。');
-      input.value = '';
-      return;
-    }
-    var reader = new FileReader();
-    reader.onload = function(e) {
-      var loadingTask = pdfjsLib.getDocument({ data: e.target.result });
-      loadingTask.promise.then(function(pdf) {
-        return pdf.getPage(1).then(function(page) {
-          var viewport = page.getViewport({ scale: 2.0 });
-          var canvas = document.createElement('canvas');
-          canvas.width = viewport.width;
-          canvas.height = viewport.height;
-          return page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport }).promise.then(function() {
-            var dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-            docFileData = dataUrl.split(',')[1];
-            docFileMimeType = 'image/jpeg';
-            console.log('[readDocumentFile] PDF→JPEG完了 ' + Math.round(docFileData.length * 3 / 4 / 1024) + 'KB');
-            document.getElementById('doc-attach-label').textContent = file.name + ' ✅';
-          });
-        });
-      }).catch(function(err) {
-        console.error('[readDocumentFile] PDF読み込みエラー:', err);
-        docChatAddMessage('ai', '⚠️ PDFの読み込みに失敗しました: ' + err.message);
-        docFileData = null;
-        input.value = '';
-      });
-    };
-    reader.onerror = function(e) {
-      console.error('[readDocumentFile] FileReader(PDF)エラー:', e);
-      docChatAddMessage('ai', '⚠️ ファイルの読み込みに失敗しました。もう一度選択してください。');
-      docFileData = null;
-      input.value = '';
-    };
-    reader.readAsArrayBuffer(file);
-  } else {
-    var objectUrl = URL.createObjectURL(file);
-    var imgEl = new Image();
-    imgEl.onload = function() {
-      URL.revokeObjectURL(objectUrl);
-      try {
-        var canvas = document.createElement('canvas');
-        canvas.width = imgEl.width;
-        canvas.height = imgEl.height;
-        canvas.getContext('2d').drawImage(imgEl, 0, 0);
-        var dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-        docFileData = dataUrl.split(',')[1];
-        docFileMimeType = 'image/jpeg';
-        console.log('[readDocumentFile] 画像→JPEG変換完了 ≈' + Math.round(docFileData.length * 3 / 4 / 1024) + 'KB');
-        document.getElementById('doc-attach-label').textContent = file.name + ' ✅';
-      } catch(err) {
-        console.error('[readDocumentFile] Canvas変換エラー:', err);
-        docChatAddMessage('ai', '⚠️ 画像の読み込みに失敗しました。別の写真を選択してください。');
-        docFileData = null;
-        input.value = '';
-      }
-    };
-    imgEl.onerror = function() {
-      URL.revokeObjectURL(objectUrl);
-      console.error('[readDocumentFile] Image読み込みエラー');
-      docChatAddMessage('ai', '⚠️ 画像の読み込みに失敗しました。別の写真を選択してください。');
-      docFileData = null;
-      input.value = '';
-    };
-    imgEl.src = objectUrl;
-  }
+  docChatFile = file;
+  document.getElementById('doc-attach-label').textContent = file.name + ' ✅';
 }
 
 async function analyzeDocument() {
-  if (!docFileData || docFileData.length === 0) {
-    var label = document.getElementById('doc-attach-label').textContent;
-    if (label && label !== '写真またはPDFを添付してください' && !label.includes('✅')) {
-      docChatAddMessage('ai', '⚠️ ファイルを読み込み中です。少し待ってから送信してください。');
-    } else {
-      docChatAddMessage('ai', '⚠️ 先に写真またはPDFを添付してください。');
-    }
+  if (!docChatFile) {
+    docChatAddMessage('ai', '⚠️ 先に写真またはPDFを添付してください。');
     return;
   }
 
-  docChatAddMessage('user', '📎 ' + (docFileName || '指示書'));
+  var file = docChatFile;
+  docChatFile = null;
+
+  docChatAddMessage('user', '📎 ' + file.name);
   document.getElementById('doc-attach-label').textContent = '写真またはPDFを添付してください';
   document.getElementById('doc-photo').value = '';
 
-  var sendData = docFileData;
-  var sendMime = docFileMimeType;
-  docFileData = null;
-  docFileMimeType = null;
-  docFileName = null;
+  var sendData, sendMime;
+
+  try {
+    var objectUrl = URL.createObjectURL(file);
+    var blob = await fetch(objectUrl).then(function(r) { return r.blob(); });
+    URL.revokeObjectURL(objectUrl);
+    var arrayBuffer = await blob.arrayBuffer();
+    var bytes = new Uint8Array(arrayBuffer);
+    var binary = '';
+    bytes.forEach(function(b) { binary += String.fromCharCode(b); });
+    sendData = btoa(binary);
+    sendMime = file.type || 'image/jpeg';
+    console.log('[analyzeDocument] ArrayBuffer→base64変換完了 ≈' + Math.round(sendData.length * 3 / 4 / 1024) + 'KB mime=' + sendMime);
+  } catch(e) {
+    console.error('[analyzeDocument] base64変換エラー:', e);
+    docChatAddMessage('ai', '⚠️ 画像の読み込みに失敗しました。別の写真を選択してください。');
+    return;
+  }
 
   var area = document.getElementById('doc-chat-messages');
   var loadWrap = document.createElement('div');
