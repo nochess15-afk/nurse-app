@@ -49,10 +49,10 @@ serve(async (req: Request) => {
       method: 'POST',
       headers: apiHeaders,
       body: JSON.stringify({
-        model: body.model,
-        max_tokens: body.max_tokens || 2000,
+        model: body.model || 'claude-sonnet-4-20250514',
+        max_tokens: body.max_tokens || 1000,
         system: body.system,
-        messages: body.messages,
+        messages: body.messages || [{ role: 'user', content: 'test' }],
       }),
     });
 
