@@ -2514,7 +2514,7 @@ async function analyzeDocument() {
   clearRegForm();
 
   try {
-    var response = await fetch('/.netlify/functions/claude', {
+    var response = await fetch('https://nurse-aide-claude.nochess15.workers.dev', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache, no-store', 'Pragma': 'no-cache' },
       body: JSON.stringify({
