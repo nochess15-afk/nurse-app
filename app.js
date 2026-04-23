@@ -2410,7 +2410,9 @@ async function savePatientOnly() {
 }
 
 // ===== 書類から患者情報読み取り（チャット方式） =====
-var docChatFile = null;
+var docChatFileData = null;
+var docChatFileMime = null;
+var docChatFileName = null;
 
 function docChatAddMessage(role, html) {
   var area = document.getElementById('doc-chat-messages');
@@ -2447,41 +2449,39 @@ function readDocumentFile(input) {
     return;
   }
 
-  docChatFile = file;
-  document.getElementById('doc-attach-label').textContent = file.name + ' ✅';
+  docChatFileName = file.name;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    docChatFileData = e.target.result.split(',')[1];
+    docChatFileMime = file.type || 'image/jpeg';
+    console.log('[readDocumentFile] 読み込み完了 ≈' + Math.round(docChatFileData.length * 3 / 4 / 1024) + 'KB mime=' + docChatFileMime);
+    document.getElementById('doc-attach-label').textContent = file.name + ' ✅';
+  };
+  reader.onerror = function() {
+    console.error('[readDocumentFile] FileReaderエラー');
+    docChatAddMessage('ai', '⚠️ 画像の読み込みに失敗しました。別の写真を選択してください。');
+    docChatFileData = null;
+    input.value = '';
+  };
+  reader.readAsDataURL(file);
 }
 
 async function analyzeDocument() {
-  if (!docChatFile) {
+  if (!docChatFileData) {
     docChatAddMessage('ai', '⚠️ 先に写真またはPDFを添付してください。');
     return;
   }
 
-  var file = docChatFile;
-  docChatFile = null;
+  var sendData = docChatFileData;
+  var sendMime = docChatFileMime;
+  var sendName = docChatFileName;
+  docChatFileData = null;
+  docChatFileMime = null;
+  docChatFileName = null;
 
-  docChatAddMessage('user', '📎 ' + file.name);
+  docChatAddMessage('user', '📎 ' + sendName);
   document.getElementById('doc-attach-label').textContent = '写真またはPDFを添付してください';
   document.getElementById('doc-photo').value = '';
-
-  var sendData, sendMime;
-
-  try {
-    var objectUrl = URL.createObjectURL(file);
-    var blob = await fetch(objectUrl).then(function(r) { return r.blob(); });
-    URL.revokeObjectURL(objectUrl);
-    var arrayBuffer = await blob.arrayBuffer();
-    var bytes = new Uint8Array(arrayBuffer);
-    var binary = '';
-    bytes.forEach(function(b) { binary += String.fromCharCode(b); });
-    sendData = btoa(binary);
-    sendMime = file.type || 'image/jpeg';
-    console.log('[analyzeDocument] ArrayBuffer→base64変換完了 ≈' + Math.round(sendData.length * 3 / 4 / 1024) + 'KB mime=' + sendMime);
-  } catch(e) {
-    console.error('[analyzeDocument] base64変換エラー:', e);
-    docChatAddMessage('ai', '⚠️ 画像の読み込みに失敗しました。別の写真を選択してください。');
-    return;
-  }
 
   var area = document.getElementById('doc-chat-messages');
   var loadWrap = document.createElement('div');
