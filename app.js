@@ -733,8 +733,17 @@ async function selectPatient(p) {
   var detailContent = document.getElementById('patient-detail-content');
   if (detailContent) detailContent.innerHTML = '';
 
-  // 患者切り替え時は記録欄・バイタルをクリア＋下書きも削除
-  try { localStorage.removeItem('nurseapp_draft'); } catch(e) {}
+  // 患者切り替え時は記録欄・バイタルをクリア（下書きは患者IDで管理するため残す）
+  try {
+    var _d = localStorage.getItem('nurseapp_draft');
+    if (_d) {
+      var _dp = JSON.parse(_d);
+      // 別の患者の下書きなら削除
+      if (_dp.patientId && patient && _dp.patientId !== patient.id) {
+        localStorage.removeItem('nurseapp_draft');
+      }
+    }
+  } catch(e) {}
   var vcEl = document.getElementById('visit-content');
   if (vcEl) vcEl.value = '';
   var obsEl = document.getElementById('visit-observations');
@@ -756,6 +765,7 @@ function showKarteView() {
 function showRecordView() {
   document.getElementById('view-karte').style.display = 'none';
   document.getElementById('view-record').style.display = '';
+  restoreDraftFromLocal();
 }
 
 // ===== 共通必須観察項目（疾患問わず毎回確認） =====
@@ -1664,6 +1674,9 @@ async function saveVisit() {
     document.getElementById('vt-consciousness').value = '清明';
     var disp = document.getElementById('vt-consciousness-display'); if(disp) disp.textContent = '清明';
     document.getElementById('visit-observations').value = '';
+    try { localStorage.removeItem('nurseapp_draft'); } catch(e) {}
+    var banner = document.getElementById('draft-restore-banner');
+    if (banner) banner.style.display = 'none';
     showStatus('✅ 記録を保存しました');
     loadVisits();
     // 保存日がスケジュール表示日と一致すれば反映
@@ -2965,29 +2978,52 @@ async function autoSaveDraft() {
 
 function restoreDraftFromLocal() {
   try {
+    var banner = document.getElementById('draft-restore-banner');
+    if (banner) banner.style.display = 'none';
+
     var draftStr = localStorage.getItem('nurseapp_draft');
     if (!draftStr) return;
     var draft = JSON.parse(draftStr);
+
     // 24時間以内の下書きのみ復元
     if (!draft.savedAt || (Date.now() - draft.savedAt) > 24 * 60 * 60 * 1000) {
       localStorage.removeItem('nurseapp_draft');
       return;
     }
-    // 記録欄が空のときだけ復元、かつ同じ患者のときだけ
-    var contentEl = document.getElementById('visit-content');
+    // 同じ患者のときだけ復元
     if (draft.patientId && currentPatient && draft.patientId !== currentPatient.id) {
-      localStorage.removeItem('nurseapp_draft');
       return;
     }
-    if (contentEl && !contentEl.value && draft.content) {
-      contentEl.value = draft.content;
-      var obsEl = document.getElementById('visit-observations');
-      if (obsEl && draft.observations) obsEl.value = draft.observations;
-      var dateEl = document.getElementById('visit-date');
-      if (dateEl && draft.date) dateEl.value = draft.date;
-      showStatus('📝 前回の下書きを復元しました', 4000);
+
+    var contentEl = document.getElementById('visit-content');
+    if (!contentEl || contentEl.value) return;
+    if (!draft.content && !draft.observations) return;
+
+    if (draft.content) contentEl.value = draft.content;
+    var obsEl = document.getElementById('visit-observations');
+    if (obsEl && draft.observations) obsEl.value = draft.observations;
+    var dateEl = document.getElementById('visit-date');
+    if (dateEl && draft.date) dateEl.value = draft.date;
+
+    // バナー表示
+    if (banner) {
+      var savedTime = draft.savedAt ? new Date(draft.savedAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) : '';
+      var msgEl = document.getElementById('draft-restore-msg');
+      if (msgEl) msgEl.textContent = '📝 下書きを復元しました（保存日時：' + savedTime + '）';
+      banner.style.display = 'flex';
     }
   } catch(e) {}
+}
+
+function discardDraft() {
+  try { localStorage.removeItem('nurseapp_draft'); } catch(e) {}
+  var contentEl = document.getElementById('visit-content');
+  if (contentEl) contentEl.value = '';
+  var obsEl = document.getElementById('visit-observations');
+  if (obsEl) obsEl.value = '';
+  var banner = document.getElementById('draft-restore-banner');
+  if (banner) banner.style.display = 'none';
+  showStatus('🗑️ 下書きを破棄しました', 3000);
 }
 
 // ===== 初回同意 =====

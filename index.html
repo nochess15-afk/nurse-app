@@ -483,6 +483,10 @@
 
   <!-- 記録ビュー -->
   <div id="view-record" style="display:none">
+    <div id="draft-restore-banner" style="display:none;background:#fff3cd;border:1.5px solid #f0a500;border-radius:8px;padding:10px 14px;margin-bottom:12px;display:none;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+      <span id="draft-restore-msg" style="font-size:13px;color:#856404"></span>
+      <button onclick="discardDraft()" style="background:#e65100;color:white;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;white-space:nowrap">破棄して新規作成</button>
+    </div>
     <button class="btn btn-secondary btn-sm" onclick="showKarteView()" style="margin-bottom:16px">← カルテに戻る</button>
 
     <div style="display:grid;grid-template-columns:1fr 280px;gap:16px;align-items:start">
