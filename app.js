@@ -2453,21 +2453,38 @@ function readDocumentFile(input) {
 
   docChatFileName = file.name;
   docChatFileMime = isPdf ? 'application/pdf' : (file.type || 'image/jpeg');
-  var reader = new FileReader();
-  reader.onload = function(e) {
-    console.log('[FileReader.onload] result length=', e.target.result ? e.target.result.length : 'null');
-    docChatFileData = e.target.result.split(',')[1];
-    console.log('[readDocumentFile] 読み込み完了 ≈' + Math.round(docChatFileData.length * 3 / 4 / 1024) + 'KB mime=' + docChatFileMime);
-    document.getElementById('doc-attach-label').textContent = file.name + ' ✅';
-  };
-  reader.onerror = function() {
-    console.log('[FileReader.onerror] error=', reader.error);
-    console.error('[readDocumentFile] FileReaderエラー');
-    docChatAddMessage('ai', '⚠️ 画像の読み込みに失敗しました。別の写真を選択してください。');
-    docChatFileData = null;
-    input.value = '';
-  };
-  reader.readAsDataURL(file);
+
+  if (isPdf) {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      console.log('[FileReader.onload] PDF arrayBuffer length=', e.target.result ? e.target.result.byteLength : 'null');
+      docChatFileData = e.target.result;
+      console.log('[readDocumentFile] PDF読み込み完了 ≈' + Math.round(e.target.result.byteLength / 1024) + 'KB');
+      document.getElementById('doc-attach-label').textContent = file.name + ' ✅';
+    };
+    reader.onerror = function() {
+      console.log('[FileReader.onerror] error=', reader.error);
+      docChatAddMessage('ai', '⚠️ PDFの読み込みに失敗しました。別のファイルを選択してください。');
+      docChatFileData = null;
+      input.value = '';
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      console.log('[FileReader.onload] result length=', e.target.result ? e.target.result.length : 'null');
+      docChatFileData = e.target.result.split(',')[1];
+      console.log('[readDocumentFile] 画像読み込み完了 ≈' + Math.round(docChatFileData.length * 3 / 4 / 1024) + 'KB mime=' + docChatFileMime);
+      document.getElementById('doc-attach-label').textContent = file.name + ' ✅';
+    };
+    reader.onerror = function() {
+      console.log('[FileReader.onerror] error=', reader.error);
+      docChatAddMessage('ai', '⚠️ 画像の読み込みに失敗しました。別の写真を選択してください。');
+      docChatFileData = null;
+      input.value = '';
+    };
+    reader.readAsDataURL(file);
+  }
 }
 
 async function analyzeDocument() {
@@ -2498,27 +2515,50 @@ async function analyzeDocument() {
 
   try {
     var isPdfSend = sendMime === 'application/pdf';
-    var fetchHeaders = {
-      'Content-Type': 'application/json',
-      'Cache-Control': 'no-cache, no-store',
-      'Pragma': 'no-cache'
-    };
-    if (isPdfSend) fetchHeaders['anthropic-beta'] = 'pdfs-2024-09-25';
+    var requestSystem, requestMessages;
+
+    if (isPdfSend) {
+      // PDF.jsでテキスト抽出
+      var pdfDoc = await pdfjsLib.getDocument({ data: sendData }).promise;
+      var allText = '';
+      for (var p = 1; p <= pdfDoc.numPages; p++) {
+        var page = await pdfDoc.getPage(p);
+        var tc = await page.getTextContent();
+        allText += tc.items.map(function(i) { return i.str; }).join(' ') + '\n';
+      }
+      allText = allText.trim();
+      console.log('[analyzeDocument] PDF抽出テキスト長=', allText.length, '先頭200:', allText.substring(0, 200));
+
+      if (allText.length < 100) {
+        loadWrap.remove();
+        docChatAddMessage('ai', '⚠️ 手書きPDFは自動読み取りに対応していません。手動で入力してください。');
+        return;
+      }
+
+      requestSystem = 'あなたは訪問看護指示書のテキストから患者情報を抽出するAIです。JSONのみで返答。';
+      requestMessages = [{
+        role: 'user',
+        content: '以下の訪問看護指示書テキストから情報を抽出してください：\n\n' + allText + '\n\n以下のJSON形式で返答：{"name":"患者氏名","furigana":"ふりがな","age":"年齢","gender":"男性 or 女性","diagnosis1":"傷病名①","diagnosis2":"傷病名②","diagnosis3":"傷病名③","adl":"寝たきり度","dementia":"認知症の状況","medicines":"投与中の薬剤（1行1薬剤）","notes":"療養生活の留意事項","rehabilitation":"リハビリ指示内容","history":""}'
+      }];
+    } else {
+      requestSystem = 'You are reading a Japanese home visit nursing instruction form. Reply only in JSON. No markdown.';
+      requestMessages = [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: sendMime, data: sendData } },
+          { type: 'text', text: 'Read this photo carefully. Extract only what is handwritten or filled in. Return JSON:\n{"name":"kanji name in 患者氏名","furigana":"ふりがな","age":"number","gender":"男性 or 女性","diagnosis1":"傷病名(1)","diagnosis2":"傷病名(2)","diagnosis3":"傷病名(3)","adl":"circle mark in 寝たきり度 J1/J2/A1/A2/B1/B2/C1/C2","dementia":"circle mark in 認知症 Ⅰ/Ⅱa/Ⅱb/Ⅲa/Ⅲb/Ⅳ/M","medicines":"handwritten drugs only, one per line","notes":"handwritten text in 留意事項","rehabilitation":"handwritten numbers and checked items only","history":""}' }
+        ]
+      }];
+    }
 
     var response = await fetch('https://nurse-aide-claude.nochess15.workers.dev', {
       method: 'POST',
-      headers: fetchHeaders,
+      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache, no-store', 'Pragma': 'no-cache' },
       body: JSON.stringify({
         model: CLAUDE_MODEL,
         max_tokens: 1500,
-        system: 'You are reading a Japanese home visit nursing instruction form. Reply only in JSON. No markdown.',
-        messages: [{
-          role: 'user',
-          content: [
-            { type: isPdfSend ? 'document' : 'image', source: { type: 'base64', media_type: sendMime, data: sendData } },
-            { type: 'text', text: 'Read this photo carefully. Extract only what is handwritten or filled in. Return JSON:\n{"name":"kanji name in 患者氏名","furigana":"ふりがな","age":"number","gender":"男性 or 女性","diagnosis1":"傷病名(1)","diagnosis2":"傷病名(2)","diagnosis3":"傷病名(3)","adl":"circle mark in 寝たきり度 J1/J2/A1/A2/B1/B2/C1/C2","dementia":"circle mark in 認知症 Ⅰ/Ⅱa/Ⅱb/Ⅲa/Ⅲb/Ⅳ/M","medicines":"handwritten drugs only, one per line","notes":"handwritten text in 留意事項","rehabilitation":"handwritten numbers and checked items only","history":""}' }
-          ]
-        }]
+        system: requestSystem,
+        messages: requestMessages
       })
     });
 
