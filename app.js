@@ -788,7 +788,10 @@ function showPatientDetailInTab(el) {
 
     var detail = document.getElementById('pt-patient-detail');
     console.log('[showPatientDetailInTab] #pt-patient-detail:', detail);
-    if (detail) detail.style.display = 'block';
+    if (detail) {
+      detail.style.display = 'block';
+      setTimeout(function() { detail.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }, 50);
+    }
 
     var nameEl = document.getElementById('pt-patient-name-title');
     if (nameEl) nameEl.textContent = p.name;
