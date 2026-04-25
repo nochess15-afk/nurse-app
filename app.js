@@ -579,16 +579,73 @@ function selectSchPatient(id, name) {
 var showAllPatients = false;
 
 // ===== 内服薬マイグレーション（文字列→JSON配列）=====
+
+// 結合文字列かどうか判定（60文字以上 or 剤形語が2回以上）
+function isConcatenatedMedicines(str) {
+  if (str.length >= 60) return true;
+  var matches = str.match(/錠|カプセル|テープ|パップ|液剤|散剤?|包|軟膏/g);
+  return matches && matches.length >= 2;
+}
+
+// Claude APIで結合内服薬を分割し、DBに保存する
+async function splitMedicinesWithClaude(patient, rawStr) {
+  var prompt = '以下の文字列は複数の内服薬が連結されたものです。1薬剤1要素のJSON配列に分割してください。薬剤名・用量・用法をそれぞれ1つの文字列にまとめて配列要素としてください。JSON配列のみ返してください。\n\n' + rawStr;
+  try {
+    var text = await callClaude('', prompt, true);
+    // JSON部分を抽出
+    var jsonMatch = text.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) throw new Error('JSON配列が見つかりません');
+    var arr = JSON.parse(jsonMatch[0]);
+    if (!Array.isArray(arr) || !arr.length) throw new Error('空の配列');
+    var cleaned = arr.map(function(x) { return String(x).trim(); }).filter(Boolean);
+    var newVal = JSON.stringify(cleaned);
+    patient.medicines = newVal;
+    supabaseFetch('patients?id=eq.' + patient.id, 'PATCH', { medicines: newVal })
+      .catch(function(e) { console.warn('[splitMedicinesClaude] DB保存失敗:', patient.name, e); });
+    console.log('[splitMedicinesClaude] 分割成功:', patient.name, cleaned);
+  } catch(e) {
+    console.warn('[splitMedicinesClaude] 分割失敗:', patient.name, e.message);
+  }
+}
+
 function migrateMedicinesIfNeeded(patient) {
   if (!patient.medicines) return;
   var m = patient.medicines;
-  // 既にJSON配列文字列なら不要
-  if (typeof m === 'string' && m.trim().charAt(0) === '[') return;
+  // 既にJSON配列文字列なら個々の要素を検査
+  if (typeof m === 'string' && m.trim().charAt(0) === '[') {
+    try {
+      var arr = JSON.parse(m);
+      if (Array.isArray(arr)) {
+        var needsSplit = arr.some(function(item) {
+          return typeof item === 'string' && isConcatenatedMedicines(item);
+        });
+        if (needsSplit) {
+          // 配列内の結合要素を展開してから再チェック
+          var expanded = [];
+          arr.forEach(function(item) {
+            if (typeof item === 'string' && isConcatenatedMedicines(item)) {
+              // Claude分割をバックグラウンドで実行（全要素結合して渡す）
+              splitMedicinesWithClaude(patient, item);
+            } else {
+              expanded.push(item);
+            }
+          });
+        }
+        return;
+      }
+    } catch(e) {}
+    return;
+  }
+  // 非JSON文字列：まず正規表現で分割試行
   var arr = parseMedicinesList(m);
   if (!arr.length) return;
+  // 分割後も要素が1つで結合文字列と判定される場合はClaude APIで分割
+  if (arr.length === 1 && isConcatenatedMedicines(arr[0])) {
+    splitMedicinesWithClaude(patient, arr[0]);
+    return;
+  }
   var newVal = JSON.stringify(arr);
   patient.medicines = newVal;
-  // バックグラウンドでDBに保存（失敗しても表示に影響なし）
   supabaseFetch('patients?id=eq.' + patient.id, 'PATCH', { medicines: newVal })
     .catch(function(e) { console.warn('[migrateMedicines] DB保存失敗:', patient.name, e); });
 }
