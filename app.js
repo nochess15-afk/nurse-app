@@ -2928,8 +2928,7 @@ function startAutoSave() {
     saveDraftToLocal();
   });
 
-  // 起動時に下書きを復元
-  restoreDraftFromLocal();
+  // 起動時の復元はしない（記録タブを開いたときに restoreDraftFromLocal() を呼ぶ）
 }
 
 function saveDraftToLocal() {
@@ -2981,30 +2980,42 @@ function restoreDraftFromLocal() {
     var banner = document.getElementById('draft-restore-banner');
     if (banner) banner.style.display = 'none';
 
+    // 患者未選択なら復元しない
+    if (!currentPatient) return;
+
     var draftStr = localStorage.getItem('nurseapp_draft');
-    if (!draftStr) return;
+    if (!draftStr) {
+      console.log('[restoreDraftFromLocal] 下書きなし');
+      return;
+    }
     var draft = JSON.parse(draftStr);
+    console.log('[restoreDraftFromLocal] 下書き発見 patientId=', draft.patientId, 'currentPatient.id=', currentPatient.id, 'savedAt=', draft.savedAt);
 
     // 24時間以内の下書きのみ復元
     if (!draft.savedAt || (Date.now() - draft.savedAt) > 24 * 60 * 60 * 1000) {
+      console.log('[restoreDraftFromLocal] 下書きが古すぎるため削除');
       localStorage.removeItem('nurseapp_draft');
       return;
     }
     // 同じ患者のときだけ復元
-    if (draft.patientId && currentPatient && draft.patientId !== currentPatient.id) {
+    if (draft.patientId && draft.patientId !== currentPatient.id) {
+      console.log('[restoreDraftFromLocal] 患者IDが異なるためスキップ');
+      return;
+    }
+    if (!draft.content && !draft.observations) {
+      console.log('[restoreDraftFromLocal] 下書きが空のためスキップ');
       return;
     }
 
     var contentEl = document.getElementById('visit-content');
-    if (!contentEl || contentEl.value) return;
-    if (!draft.content && !draft.observations) return;
-
+    if (!contentEl) return;
     if (draft.content) contentEl.value = draft.content;
     var obsEl = document.getElementById('visit-observations');
     if (obsEl && draft.observations) obsEl.value = draft.observations;
     var dateEl = document.getElementById('visit-date');
     if (dateEl && draft.date) dateEl.value = draft.date;
 
+    console.log('[restoreDraftFromLocal] 復元完了、バナー表示');
     // バナー表示
     if (banner) {
       var savedTime = draft.savedAt ? new Date(draft.savedAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) : '';
@@ -3012,7 +3023,7 @@ function restoreDraftFromLocal() {
       if (msgEl) msgEl.textContent = '📝 下書きを復元しました（保存日時：' + savedTime + '）';
       banner.style.display = 'flex';
     }
-  } catch(e) {}
+  } catch(e) { console.error('[restoreDraftFromLocal] エラー:', e); }
 }
 
 function discardDraft() {
