@@ -1082,6 +1082,23 @@ function parseMedicinesList(val) {
   if (/[、，,]/.test(s)) {
     return s.split(/[、，,]/).map(function(x) { return x.trim(); }).filter(Boolean);
   }
+  // Concatenated drug string split at drug-name boundaries
+  var drugNameStart = /[ァ-ヶーA-Za-z\u4e00-\u9fff\u3040-\u309f]/;
+  var splitResult = null;
+  try {
+    // Lookbehind: split after dosage/unit info before next drug name
+    var lbRe = /(?<=(?:錠|カプセル剤?|テープ|パップ|液|散|包|本|枚|個|mg|μg|g|ml)[^\s]*\s*(?:\d+日分|朝食後|昼食後|夕食後|就寝前|食前|食後|食間|頓服|貼付[^\s]*)?)\s+(?=[ァ-ヶーA-Za-zぁ-ん\u4e00-\u9fff])/g;
+    var parts = s.split(lbRe);
+    if (parts.length > 1) splitResult = parts;
+  } catch(e) {
+    // Lookbehind unsupported: split before patterns like "カタカナ/漢字 with preceding space"
+    var fbParts = s.split(/\s+(?=[ァ-ヶーA-Za-zぁ-ん\u4e00-\u9fff][^\s]*(?:錠|カプセル|テープ|パップ|液|散|包|mg|μg|g|ml))/g);
+    if (fbParts.length > 1) splitResult = fbParts;
+  }
+  if (splitResult) {
+    var cleaned = splitResult.map(function(x) { return x.trim(); }).filter(Boolean);
+    if (cleaned.length > 1) return cleaned;
+  }
   // Single item
   return [s];
 }
