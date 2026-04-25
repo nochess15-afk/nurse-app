@@ -2452,11 +2452,11 @@ function readDocumentFile(input) {
   }
 
   docChatFileName = file.name;
+  docChatFileMime = isPdf ? 'application/pdf' : (file.type || 'image/jpeg');
   var reader = new FileReader();
   reader.onload = function(e) {
     console.log('[FileReader.onload] result length=', e.target.result ? e.target.result.length : 'null');
     docChatFileData = e.target.result.split(',')[1];
-    docChatFileMime = file.type || 'image/jpeg';
     console.log('[readDocumentFile] 読み込み完了 ≈' + Math.round(docChatFileData.length * 3 / 4 / 1024) + 'KB mime=' + docChatFileMime);
     document.getElementById('doc-attach-label').textContent = file.name + ' ✅';
   };
@@ -2497,9 +2497,17 @@ async function analyzeDocument() {
   clearRegForm();
 
   try {
+    var isPdfSend = sendMime === 'application/pdf';
+    var fetchHeaders = {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-cache, no-store',
+      'Pragma': 'no-cache'
+    };
+    if (isPdfSend) fetchHeaders['anthropic-beta'] = 'pdfs-2024-09-25';
+
     var response = await fetch('https://nurse-aide-claude.nochess15.workers.dev', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache, no-store', 'Pragma': 'no-cache' },
+      headers: fetchHeaders,
       body: JSON.stringify({
         model: CLAUDE_MODEL,
         max_tokens: 1500,
@@ -2507,7 +2515,7 @@ async function analyzeDocument() {
         messages: [{
           role: 'user',
           content: [
-            { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: sendData } },
+            { type: isPdfSend ? 'document' : 'image', source: { type: 'base64', media_type: sendMime, data: sendData } },
             { type: 'text', text: 'Read this photo carefully. Extract only what is handwritten or filled in. Return JSON:\n{"name":"kanji name in 患者氏名","furigana":"ふりがな","age":"number","gender":"男性 or 女性","diagnosis1":"傷病名(1)","diagnosis2":"傷病名(2)","diagnosis3":"傷病名(3)","adl":"circle mark in 寝たきり度 J1/J2/A1/A2/B1/B2/C1/C2","dementia":"circle mark in 認知症 Ⅰ/Ⅱa/Ⅱb/Ⅲa/Ⅲb/Ⅳ/M","medicines":"handwritten drugs only, one per line","notes":"handwritten text in 留意事項","rehabilitation":"handwritten numbers and checked items only","history":""}' }
           ]
         }]
