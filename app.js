@@ -578,11 +578,28 @@ function selectSchPatient(id, name) {
 // ===== 患者一覧フィルタリング =====
 var showAllPatients = false;
 
+// ===== 内服薬マイグレーション（文字列→JSON配列）=====
+function migrateMedicinesIfNeeded(patient) {
+  if (!patient.medicines) return;
+  var m = patient.medicines;
+  // 既にJSON配列文字列なら不要
+  if (typeof m === 'string' && m.trim().charAt(0) === '[') return;
+  var arr = parseMedicinesList(m);
+  if (!arr.length) return;
+  var newVal = JSON.stringify(arr);
+  patient.medicines = newVal;
+  // バックグラウンドでDBに保存（失敗しても表示に影響なし）
+  supabaseFetch('patients?id=eq.' + patient.id, 'PATCH', { medicines: newVal })
+    .catch(function(e) { console.warn('[migrateMedicines] DB保存失敗:', patient.name, e); });
+}
+
 // ===== 患者一覧 =====
 async function loadPatients() {
   const container = document.getElementById('patient-list-container');
   try {
     var patients = await supabaseFetch('patients?order=name.asc');
+    // 内服薬フォーマットを自動マイグレーション
+    patients.forEach(migrateMedicinesIfNeeded);
     // 全患者をキャッシュ
     window.allPatientsCache = patients;
     window.allPatientsForList = patients;
@@ -1039,11 +1056,34 @@ function adlJsonToText(str) {
   return Object.keys(obj).map(function(k) { return k + '：' + obj[k]; }).join('、');
 }
 
-// 内服薬文字列を配列に変換（改行区切り優先、なければカンマ区切り）
-function parseMedicinesList(str) {
-  if (!str) return [];
-  if (str.indexOf('\n') >= 0) return str.split('\n').filter(Boolean);
-  return str.split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+// 内服薬を配列に変換（配列/JSON文字列/区切り文字列すべて対応）
+function parseMedicinesList(val) {
+  if (!val) return [];
+  // Already an array
+  if (Array.isArray(val)) {
+    return val.map(function(s) { return String(s).trim(); }).filter(Boolean);
+  }
+  var s = String(val).trim();
+  if (!s) return [];
+  // JSON array string
+  if (s.charAt(0) === '[') {
+    try {
+      var arr = JSON.parse(s);
+      if (Array.isArray(arr)) {
+        return arr.map(function(x) { return String(x).trim(); }).filter(Boolean);
+      }
+    } catch(e) {}
+  }
+  // Newline separated
+  if (s.indexOf('\n') >= 0) {
+    return s.split('\n').map(function(x) { return x.trim(); }).filter(Boolean);
+  }
+  // Japanese/western comma or 読点
+  if (/[、，,]/.test(s)) {
+    return s.split(/[、，,]/).map(function(x) { return x.trim(); }).filter(Boolean);
+  }
+  // Single item
+  return [s];
 }
 
 // HTML特殊文字エスケープ
@@ -1129,16 +1169,16 @@ function renderMedicineRowsWithWarnings(containerId, medicines, suspiciousNames)
   }).join('');
 }
 
-// 行から内服薬文字列を取得（改行結合）
+// 行から内服薬をJSON配列文字列で取得
 function getMedicinesFromRows(containerId) {
   var container = document.getElementById(containerId);
-  if (!container) return '';
+  if (!container) return null;
   var lines = [];
   container.querySelectorAll('.med-row input[type="text"]').forEach(function(inp) {
     var v = inp.value.trim();
     if (v) lines.push(v);
   });
-  return lines.join('\n');
+  return lines.length ? JSON.stringify(lines) : null;
 }
 
 // ===== 患者登録 =====
@@ -1394,7 +1434,7 @@ async function analyzeMedicinePhoto() {
             },
             {
               type: 'text',
-              text: 'このお薬手帳の画像から内服薬の一覧を読み取ってください。以下の形式で番号付きリストとして出力してください。\n1. 薬剤名 用量 用法\n2. 薬剤名 用量 用法\n（以降同様）\n前置き・後置きの説明は不要です。読み取れない場合のみその旨を伝えてください。'
+              text: 'このお薬手帳の画像から内服薬の一覧を読み取り、1薬剤1要素のJSON配列で返してください。形式: ["薬剤名 用量 用法", "薬剤名 用量 用法", ...]\n前置き・説明は不要。読み取れない場合は空配列[]を返してください。'
             }
           ]
         }]
@@ -1402,11 +1442,22 @@ async function analyzeMedicinePhoto() {
     });
 
     var data = await response.json();
-    var result = data.content[0].text;
+    var rawText = data.content[0].text;
+
+    // JSON配列としてパース（失敗時は行分割でフォールバック）
+    var newMeds = [];
+    var jsonMatch = rawText.trim().match(/\[[\s\S]*\]/);
+    if (jsonMatch) {
+      try { newMeds = JSON.parse(jsonMatch[0]); } catch(e) {}
+    }
+    if (!newMeds.length) {
+      newMeds = rawText.split('\n').map(function(l) { return l.replace(/^\d+[\.\)]\s*/, '').trim(); }).filter(Boolean);
+    }
 
     // 既存行と結合
-    var current = getMedicinesFromRows('reg-medicines-rows');
-    var combined = current ? current + '\n' + result : result;
+    var currentArr = parseMedicinesList(getMedicinesFromRows('reg-medicines-rows'));
+    var combined = currentArr.concat(newMeds);
+    var combinedStr = JSON.stringify(combined);
 
     // 薬剤チェック（後処理・失敗しても表示はする）
     btn.innerHTML = '<span class="loading-dot"><span></span><span></span><span></span></span> 薬剤名を確認中...';
@@ -1414,7 +1465,7 @@ async function analyzeMedicinePhoto() {
     try {
       var checkRaw = await callClaude(
         'あなたは薬剤名の検証AIです。JSONのみで返答してください。前置き・説明・マークダウン不要。',
-        '以下の薬剤リストに、日本で実在しない・読み取りエラーと思われる薬剤名が含まれていますか？\n' + combined + '\n返答形式：{"suspicious": true/false, "names": ["疑わしい薬剤名1", ...]}'
+        '以下の薬剤リストに、日本で実在しない・読み取りエラーと思われる薬剤名が含まれていますか？\n' + combined.join('\n') + '\n返答形式：{"suspicious": true/false, "names": ["疑わしい薬剤名1", ...]}'
       );
       var checkJson = checkRaw.trim().replace(/^```[a-z]*\n?/, '').replace(/\n?```$/, '');
       var checkResult = JSON.parse(checkJson);
@@ -1423,7 +1474,7 @@ async function analyzeMedicinePhoto() {
       // チェック失敗は無視して表示続行
     }
 
-    renderMedicineRowsWithWarnings('reg-medicines-rows', combined, suspiciousNames);
+    renderMedicineRowsWithWarnings('reg-medicines-rows', combinedStr, suspiciousNames);
 
     if (suspiciousNames.length) {
       showStatus('⚠️ 読み取り完了。疑わしい薬剤名があります（赤枠の行を確認してください）', 6000);
@@ -2203,7 +2254,7 @@ async function saveMedicines() {
     // 表示を更新
     var medHtml = '';
     if (medicines) {
-      var medList = medicines.split('\n').filter(Boolean);
+      var medList = parseMedicinesList(medicines);
       medHtml = '<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">' +
         '<div style="font-size:11px;font-weight:700;color:var(--text-secondary);margin-bottom:6px">💊 内服薬（' + medList.length + '種類）</div>' +
         '<div style="display:flex;flex-wrap:wrap;gap:5px">' +
@@ -2272,7 +2323,7 @@ async function saveMedicinesSide() {
     // 患者カードのタグも更新
     var medHtml = '';
     if (medicines) {
-      var medList = medicines.split('\n').filter(Boolean);
+      var medList = parseMedicinesList(medicines);
       medHtml = '<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">' +
         '<div style="font-size:11px;font-weight:700;color:var(--text-secondary);margin-bottom:6px">💊 内服薬（' + medList.length + '種類）</div>' +
         '<div style="display:flex;flex-wrap:wrap;gap:5px">' +
@@ -2552,7 +2603,7 @@ async function analyzeDocument() {
       requestSystem = 'あなたは訪問看護指示書のテキストから患者情報を抽出するAIです。JSONのみで返答。';
       requestMessages = [{
         role: 'user',
-        content: '以下の訪問看護指示書テキストから情報を抽出してください：\n\n' + allText + '\n\n以下のJSON形式で返答：{"name":"患者氏名","furigana":"ふりがな","age":"年齢","gender":"男性 or 女性","diagnosis1":"傷病名①","diagnosis2":"傷病名②","diagnosis3":"傷病名③","adl":"寝たきり度","dementia":"認知症の状況","medicines":"投与中の薬剤（1行1薬剤）","notes":"療養生活の留意事項","rehabilitation":"リハビリ指示内容","history":""}'
+        content: '以下の訪問看護指示書テキストから情報を抽出してください：\n\n' + allText + '\n\n以下のJSON形式で返答（medicinesは1薬剤1要素の配列）：{"name":"患者氏名","furigana":"ふりがな","age":"年齢","gender":"男性 or 女性","diagnosis1":"傷病名①","diagnosis2":"傷病名②","diagnosis3":"傷病名③","adl":"寝たきり度","dementia":"認知症の状況","medicines":["薬剤名 用量 用法","薬剤名 用量 用法"],"notes":"療養生活の留意事項","rehabilitation":"リハビリ指示内容","history":""}'
       }];
     } else {
       requestSystem = 'You are reading a Japanese home visit nursing instruction form. Reply only in JSON. No markdown.';
@@ -2560,7 +2611,7 @@ async function analyzeDocument() {
         role: 'user',
         content: [
           { type: 'image', source: { type: 'base64', media_type: sendMime, data: sendData } },
-          { type: 'text', text: 'Read this photo carefully. Extract only what is handwritten or filled in. Return JSON:\n{"name":"kanji name in 患者氏名","furigana":"ふりがな","age":"number","gender":"男性 or 女性","diagnosis1":"傷病名(1)","diagnosis2":"傷病名(2)","diagnosis3":"傷病名(3)","adl":"circle mark in 寝たきり度 J1/J2/A1/A2/B1/B2/C1/C2","dementia":"circle mark in 認知症 Ⅰ/Ⅱa/Ⅱb/Ⅲa/Ⅲb/Ⅳ/M","medicines":"handwritten drugs only, one per line","notes":"handwritten text in 留意事項","rehabilitation":"handwritten numbers and checked items only","history":""}' }
+          { type: 'text', text: 'Read this photo carefully. Extract only what is handwritten or filled in. Return JSON:\n{"name":"kanji name in 患者氏名","furigana":"ふりがな","age":"number","gender":"男性 or 女性","diagnosis1":"傷病名(1)","diagnosis2":"傷病名(2)","diagnosis3":"傷病名(3)","adl":"circle mark in 寝たきり度 J1/J2/A1/A2/B1/B2/C1/C2","dementia":"circle mark in 認知症 Ⅰ/Ⅱa/Ⅱb/Ⅲa/Ⅲb/Ⅳ/M","medicines":["handwritten drug 1 with dosage","handwritten drug 2 with dosage"],"notes":"handwritten text in 留意事項","rehabilitation":"handwritten numbers and checked items only","history":""}' }
         ]
       }];
     }
@@ -2606,17 +2657,21 @@ async function analyzeDocument() {
       return;
     }
 
-    // 薬剤名正規化（失敗時は元テキストをそのまま使用）
-    var normalizedMedicines = parsed.medicines || '';
-    if (parsed.medicines) {
+    // 薬剤名正規化（失敗時は元配列をそのまま使用）
+    var normalizedMedicines = parseMedicinesList(parsed.medicines);
+    if (normalizedMedicines.length) {
       try {
         var medRaw = await callClaude(
           'あなたは日本の薬剤名の専門家です。OCRで誤認識された薬剤名を正しい日本の薬剤名に修正してください。JSONのみで返答。前置き・マークダウン不要。',
-          '以下はOCRで読み取った薬剤リストです。誤認識と思われる薬剤名を正しい日本の実在する薬剤名に修正してください。修正できない場合はそのままにしてください。\n' + parsed.medicines + '\n返答形式：{"medicines": "修正後の薬剤リスト（元の改行・用法はそのまま保持）"}'
+          '以下はOCRで読み取った薬剤リストです。誤認識と思われる薬剤名を正しい日本の実在する薬剤名に修正してください。修正できない場合はそのままにしてください。\n' + normalizedMedicines.join('\n') + '\n返答形式：{"medicines": ["修正後薬剤1","修正後薬剤2",...]}'
         );
         var medJson = medRaw.trim().replace(/^```[a-z]*\n?/, '').replace(/\n?```$/, '');
         var medResult = JSON.parse(medJson);
-        if (medResult.medicines) normalizedMedicines = medResult.medicines;
+        if (Array.isArray(medResult.medicines)) {
+          normalizedMedicines = medResult.medicines.map(function(s){return String(s).trim();}).filter(Boolean);
+        } else if (medResult.medicines) {
+          normalizedMedicines = parseMedicinesList(medResult.medicines);
+        }
       } catch(e) { console.warn('[analyzeDocument] 薬剤名正規化失敗:', e); }
     }
 
@@ -2624,18 +2679,18 @@ async function analyzeDocument() {
     window._docNormalizedMedicines = normalizedMedicines;
 
     var lines = [];
-    if (parsed.name)           lines.push('氏名：' + parsed.name);
-    if (parsed.furigana)       lines.push('ふりがな：' + parsed.furigana);
-    if (parsed.age)            lines.push('年齢：' + parsed.age + '歳');
-    if (parsed.gender)         lines.push('性別：' + parsed.gender);
-    if (parsed.diagnosis1)     lines.push('傷病名①：' + parsed.diagnosis1);
-    if (parsed.diagnosis2)     lines.push('傷病名②：' + parsed.diagnosis2);
-    if (parsed.diagnosis3)     lines.push('傷病名③：' + parsed.diagnosis3);
-    if (parsed.adl)            lines.push('寝たきり度：' + parsed.adl);
-    if (parsed.dementia)       lines.push('認知症：' + parsed.dementia);
-    if (normalizedMedicines)   lines.push('薬剤：' + normalizedMedicines.split('\n').filter(Boolean).join('、'));
-    if (parsed.notes)          lines.push('留意事項：' + parsed.notes);
-    if (parsed.rehabilitation) lines.push('リハビリ：' + parsed.rehabilitation);
+    if (parsed.name)              lines.push('氏名：' + parsed.name);
+    if (parsed.furigana)          lines.push('ふりがな：' + parsed.furigana);
+    if (parsed.age)               lines.push('年齢：' + parsed.age + '歳');
+    if (parsed.gender)            lines.push('性別：' + parsed.gender);
+    if (parsed.diagnosis1)        lines.push('傷病名①：' + parsed.diagnosis1);
+    if (parsed.diagnosis2)        lines.push('傷病名②：' + parsed.diagnosis2);
+    if (parsed.diagnosis3)        lines.push('傷病名③：' + parsed.diagnosis3);
+    if (parsed.adl)               lines.push('寝たきり度：' + parsed.adl);
+    if (parsed.dementia)          lines.push('認知症：' + parsed.dementia);
+    if (normalizedMedicines.length) lines.push('薬剤：' + normalizedMedicines.join('、'));
+    if (parsed.notes)             lines.push('留意事項：' + parsed.notes);
+    if (parsed.rehabilitation)    lines.push('リハビリ：' + parsed.rehabilitation);
 
     var summaryHtml = '以下の内容で読み取りました。確認してください：<br><br>' +
       lines.map(function(l) { return '<span style="display:block">' + l + '</span>'; }).join('') +
@@ -2651,7 +2706,7 @@ async function analyzeDocument() {
 
 function docChatApplyForm() {
   var parsed = window._docParsed || {};
-  var normalizedMedicines = window._docNormalizedMedicines || '';
+  var normalizedMedicines = window._docNormalizedMedicines || [];
 
   if (parsed.name)        document.getElementById('reg-name').value = parsed.name;
   if (parsed.furigana)    document.getElementById('reg-furigana').value = parsed.furigana;
@@ -2664,7 +2719,7 @@ function docChatApplyForm() {
   if (parsed.dementia)    setDegreeBtn('reg-dementia', parsed.dementia);
   if (parsed.notes)       document.getElementById('reg-notes').value = parsed.notes;
   if (parsed.rehabilitation) document.getElementById('reg-rehabilitation').value = parsed.rehabilitation;
-  if (normalizedMedicines) renderMedicineRows('reg-medicines-rows', normalizedMedicines);
+  if (normalizedMedicines.length) renderMedicineRows('reg-medicines-rows', JSON.stringify(normalizedMedicines));
 
   docChatAddMessage('ai', '✅ フォームに入力しました。内容を確認して保存してください。');
   showStatus('✅ 患者情報を入力しました。内容を確認して保存してください');
