@@ -2507,7 +2507,7 @@ async function analyzeDocument() {
         messages: [{
           role: 'user',
           content: [
-            { type: 'image', source: { type: 'base64', media_type: sendMime, data: sendData } },
+            { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: sendData } },
             { type: 'text', text: 'Read this photo carefully. Extract only what is handwritten or filled in. Return JSON:\n{"name":"kanji name in 患者氏名","furigana":"ふりがな","age":"number","gender":"男性 or 女性","diagnosis1":"傷病名(1)","diagnosis2":"傷病名(2)","diagnosis3":"傷病名(3)","adl":"circle mark in 寝たきり度 J1/J2/A1/A2/B1/B2/C1/C2","dementia":"circle mark in 認知症 Ⅰ/Ⅱa/Ⅱb/Ⅲa/Ⅲb/Ⅳ/M","medicines":"handwritten drugs only, one per line","notes":"handwritten text in 留意事項","rehabilitation":"handwritten numbers and checked items only","history":""}' }
           ]
         }]
