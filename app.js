@@ -645,7 +645,7 @@ function renderPatientList(patients) {
     }
     container.innerHTML = '<div class="patient-list">' + patients.map(function(p) {
       return '<div class="patient-item fade-in" style="position:relative">' +
-        '<div style="flex:1;display:flex;align-items:center;gap:10px;cursor:pointer" data-id="' + p.id + '" onclick="selectPatientById(this)">' +
+        '<div style="flex:1;display:flex;align-items:center;gap:10px;cursor:pointer" data-id="' + p.id + '" onclick="showPatientDetailInTab(this)">' +
         '<div class="patient-info">' +
         '<h3>' + p.name + '</h3>' +
         '<p>' + (p.age ? p.age + '歳・' : '') + (p.gender || '') + (p.main_diagnosis ? '・' + p.main_diagnosis : '') + (p.nurse ? ' 担当：' + p.nurse : '') + '</p>' +
@@ -761,6 +761,133 @@ async function selectPatient(p) {
 function showKarteView() {
   document.getElementById('view-karte').style.display = '';
   document.getElementById('view-record').style.display = 'none';
+}
+
+// ===== 患者タブ内 患者詳細ビュー =====
+var ptSelectedPatient = null;
+var ptNursingChatHistory = [];
+
+function showPatientDetailInTab(el) {
+  var id = String(el.getAttribute('data-id'));
+  var cached = window.allPatientsCache || [];
+  var p = null;
+  for (var i = 0; i < cached.length; i++) {
+    if (String(cached[i].id) === id) { p = cached[i]; break; }
+  }
+  if (!p) { showStatus('⚠️ 患者情報が見つかりません'); return; }
+
+  ptSelectedPatient = p;
+
+  var detail = document.getElementById('pt-patient-detail');
+  if (detail) detail.style.display = 'block';
+
+  var nameEl = document.getElementById('pt-patient-name-title');
+  if (nameEl) nameEl.textContent = p.name;
+  var subEl = document.getElementById('pt-patient-sub');
+  if (subEl) subEl.textContent = (p.age ? p.age + '歳・' : '') + (p.gender || '') + (p.main_diagnosis ? '・' + p.main_diagnosis : '');
+
+  var medList = document.getElementById('pt-medicine-list');
+  if (medList) {
+    var medLines = parseMedicinesList(p.medicines);
+    if (medLines.length) {
+      medList.innerHTML = '<div style="display:flex;flex-direction:column;gap:6px">' +
+        medLines.map(function(med, idx) {
+          return '<div style="display:flex;align-items:baseline;gap:6px;font-size:12px;padding:4px 0;border-bottom:1px solid var(--border)">' +
+            '<span style="color:var(--primary);font-weight:700;min-width:16px">' + (idx+1) + '</span>' +
+            '<span>' + med + '</span></div>';
+        }).join('') + '</div>';
+    } else {
+      medList.innerHTML = '<div style="font-size:13px;color:var(--text-light)">内服薬の登録がありません</div>';
+    }
+  }
+
+  ptInitNursingChat(p);
+}
+
+function ptInitNursingChat(p) {
+  var target = p || ptSelectedPatient;
+  ptNursingChatHistory = [];
+  var msgs = document.getElementById('pt-nursing-chat-messages');
+  if (msgs) {
+    msgs.innerHTML = '<div style="background:var(--primary);color:white;padding:10px 14px;border-radius:12px 12px 12px 2px;font-size:12px;line-height:1.6">' +
+      (target ? target.name + 'さんについて何でも相談できます。看護・リハビリ・疾患知識など学習の質問もOKです。' : '患者を選択してください。') +
+      '</div>';
+  }
+  var input = document.getElementById('pt-nursing-chat-input');
+  var btn = document.getElementById('pt-nursing-chat-btn');
+  if (input) { input.disabled = !target; input.value = ''; }
+  if (btn) btn.disabled = !target;
+}
+
+function ptClearNursingChat() {
+  ptNursingChatHistory = [];
+  ptInitNursingChat();
+}
+
+async function ptSendNursingChat() {
+  if (!ptSelectedPatient) return;
+  var input = document.getElementById('pt-nursing-chat-input');
+  var msg = input.value.trim();
+  if (!msg) return;
+
+  var msgs = document.getElementById('pt-nursing-chat-messages');
+  var btn = document.getElementById('pt-nursing-chat-btn');
+
+  msgs.innerHTML += '<div style="background:var(--surface2);padding:10px 14px;border-radius:12px 12px 2px 12px;font-size:13px;max-width:90%;align-self:flex-end;margin-left:auto;line-height:1.6">' + msg + '</div>';
+  input.value = '';
+  btn.disabled = true;
+  btn.textContent = '…';
+  msgs.scrollTop = msgs.scrollHeight;
+
+  ptNursingChatHistory.push({ role: 'user', content: msg });
+
+  try {
+    var visits = await supabaseFetch('visits?patient_id=eq.' + ptSelectedPatient.id + '&order=visit_date.asc');
+    var visitText = visits.map(function(v) {
+      return '【' + v.visit_date + '】' + (v.content || '') + (v.observations ? ' 申し送り：' + v.observations : '');
+    }).join('\n\n');
+
+    var systemPrompt = 'あなたは経験豊富な訪問看護師・リハビリ専門家・看護教育者です。以下の役割を担います：\n' +
+      '①この患者に関する看護相談・アセスメントの相談に答える\n' +
+      '②リハビリ相談（PT・OT・ST領域）：歩行・ADL・嚥下・上肢機能・認知機能・自主トレ指導・多職種連携など\n' +
+      '③看護師・看護学生・新人看護師・リハビリスタッフへの教育・学習支援\n' +
+      '④エビデンスに基づいた実践的なアドバイス\n\n' +
+      '患者に関する質問は患者情報・記録を踏まえて答えてください。一般的な知識の質問は丁寧にわかりやすく説明してください。回答は簡潔かつ実用的に。' +
+      '\n\n【患者情報】\n氏名：' + ptSelectedPatient.name + '（' + (ptSelectedPatient.age||'不明') + '歳・' + (ptSelectedPatient.gender||'不明') + '）\n主病名：' + (ptSelectedPatient.main_diagnosis||'') +
+      '\n既往歴：' + (ptSelectedPatient.medical_history||'') + '\n医療処置：' + (ptSelectedPatient.medical_procedures||'') +
+      '\nADL：' + adlJsonToText(ptSelectedPatient.adl||'') + '\n内服薬：' + (ptSelectedPatient.medicines||'なし') +
+      '\n\n【直近の訪問記録】\n' + (visitText||'記録なし');
+
+    var messages = ptNursingChatHistory.slice(-10);
+
+    var res = await fetch('/.netlify/functions/claude', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: CLAUDE_MODEL,
+        max_tokens: 1000,
+        system: systemPrompt,
+        messages: messages
+      })
+    });
+
+    var data = await res.json();
+    var reply = data.content[0].text;
+    ptNursingChatHistory.push({ role: 'assistant', content: reply });
+
+    msgs.innerHTML += '<div style="background:var(--primary);color:white;padding:10px 14px;border-radius:12px 12px 12px 2px;font-size:13px;max-width:90%;line-height:1.7;white-space:pre-wrap">' + reply + '</div>';
+    msgs.scrollTop = msgs.scrollHeight;
+
+  } catch(e) {
+    msgs.innerHTML += '<div style="background:#fdf0f0;color:var(--error);padding:10px 14px;border-radius:12px;font-size:13px;">⚠️ エラー: ' + e.message + '</div>';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '送信';
+  }
+}
+
+function goToPatientRecord() {
+  if (ptSelectedPatient) selectPatient(ptSelectedPatient);
 }
 function showRecordView() {
   document.getElementById('view-karte').style.display = 'none';
