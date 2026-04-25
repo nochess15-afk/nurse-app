@@ -644,8 +644,8 @@ function renderPatientList(patients) {
       return;
     }
     container.innerHTML = '<div class="patient-list">' + patients.map(function(p) {
-      return '<div class="patient-item fade-in" style="position:relative">' +
-        '<div style="flex:1;display:flex;align-items:center;gap:10px;cursor:pointer" data-id="' + p.id + '" onclick="showPatientDetailInTab(this)">' +
+      return '<div class="patient-item fade-in" style="position:relative" data-id="' + p.id + '" onclick="showPatientDetailInTab(this)">' +
+        '<div style="flex:1;display:flex;align-items:center;gap:10px;pointer-events:none">' +
         '<div class="patient-info">' +
         '<h3>' + p.name + '</h3>' +
         '<p>' + (p.age ? p.age + '歳・' : '') + (p.gender || '') + (p.main_diagnosis ? '・' + p.main_diagnosis : '') + (p.nurse ? ' 担当：' + p.nurse : '') + '</p>' +
@@ -653,8 +653,8 @@ function renderPatientList(patients) {
         '<span style="color:var(--text-light);font-size:20px">›</span>' +
         '</div>' +
         '<div style="display:flex;gap:2px;flex-shrink:0">' +
-        '<button data-id="' + p.id + '" onclick="editPatientBtn(this)" style="background:none;border:none;color:#888;cursor:pointer;font-size:14px;padding:0 4px" title="編集">✏️</button>' +
-        '<button data-id="' + p.id + '" onclick="deletePatient(this)" style="background:none;border:none;color:#ccc;cursor:pointer;font-size:14px;padding:0 4px" title="削除">🗑</button>' +
+        '<button data-id="' + p.id + '" onclick="event.stopPropagation();editPatientBtn(this)" style="background:none;border:none;color:#888;cursor:pointer;font-size:14px;padding:0 4px;pointer-events:auto" title="編集">✏️</button>' +
+        '<button data-id="' + p.id + '" onclick="event.stopPropagation();deletePatient(this)" style="background:none;border:none;color:#ccc;cursor:pointer;font-size:14px;padding:0 4px;pointer-events:auto" title="削除">🗑</button>' +
         '</div>' +
         '</div>';
     }).join('') + '</div>';
@@ -768,40 +768,54 @@ var ptSelectedPatient = null;
 var ptNursingChatHistory = [];
 
 function showPatientDetailInTab(el) {
-  var id = String(el.getAttribute('data-id'));
-  var cached = window.allPatientsCache || [];
-  var p = null;
-  for (var i = 0; i < cached.length; i++) {
-    if (String(cached[i].id) === id) { p = cached[i]; break; }
-  }
-  if (!p) { showStatus('⚠️ 患者情報が見つかりません'); return; }
-
-  ptSelectedPatient = p;
-
-  var detail = document.getElementById('pt-patient-detail');
-  if (detail) detail.style.display = 'block';
-
-  var nameEl = document.getElementById('pt-patient-name-title');
-  if (nameEl) nameEl.textContent = p.name;
-  var subEl = document.getElementById('pt-patient-sub');
-  if (subEl) subEl.textContent = (p.age ? p.age + '歳・' : '') + (p.gender || '') + (p.main_diagnosis ? '・' + p.main_diagnosis : '');
-
-  var medList = document.getElementById('pt-medicine-list');
-  if (medList) {
-    var medLines = parseMedicinesList(p.medicines);
-    if (medLines.length) {
-      medList.innerHTML = '<div style="display:flex;flex-direction:column;gap:6px">' +
-        medLines.map(function(med, idx) {
-          return '<div style="display:flex;align-items:baseline;gap:6px;font-size:12px;padding:4px 0;border-bottom:1px solid var(--border)">' +
-            '<span style="color:var(--primary);font-weight:700;min-width:16px">' + (idx+1) + '</span>' +
-            '<span>' + med + '</span></div>';
-        }).join('') + '</div>';
-    } else {
-      medList.innerHTML = '<div style="font-size:13px;color:var(--text-light)">内服薬の登録がありません</div>';
+  console.log('[showPatientDetailInTab] called, el:', el);
+  try {
+    var id = String(el.getAttribute('data-id'));
+    console.log('[showPatientDetailInTab] patient id:', id);
+    var cached = window.allPatientsCache || [];
+    console.log('[showPatientDetailInTab] allPatientsCache length:', cached.length);
+    var p = null;
+    for (var i = 0; i < cached.length; i++) {
+      if (String(cached[i].id) === id) { p = cached[i]; break; }
     }
-  }
+    if (!p) {
+      console.error('[showPatientDetailInTab] 患者が見つかりません。id:', id, 'cache ids:', cached.map(function(c){return c.id;}));
+      showStatus('⚠️ 患者情報が見つかりません');
+      return;
+    }
 
-  ptInitNursingChat(p);
+    ptSelectedPatient = p;
+
+    var detail = document.getElementById('pt-patient-detail');
+    console.log('[showPatientDetailInTab] #pt-patient-detail:', detail);
+    if (detail) detail.style.display = 'block';
+
+    var nameEl = document.getElementById('pt-patient-name-title');
+    if (nameEl) nameEl.textContent = p.name;
+    var subEl = document.getElementById('pt-patient-sub');
+    if (subEl) subEl.textContent = (p.age ? p.age + '歳・' : '') + (p.gender || '') + (p.main_diagnosis ? '・' + p.main_diagnosis : '');
+
+    var medList = document.getElementById('pt-medicine-list');
+    if (medList) {
+      var medLines = parseMedicinesList(p.medicines);
+      if (medLines.length) {
+        medList.innerHTML = '<div style="display:flex;flex-direction:column;gap:6px">' +
+          medLines.map(function(med, idx) {
+            return '<div style="display:flex;align-items:baseline;gap:6px;font-size:12px;padding:4px 0;border-bottom:1px solid var(--border)">' +
+              '<span style="color:var(--primary);font-weight:700;min-width:16px">' + (idx+1) + '</span>' +
+              '<span>' + med + '</span></div>';
+          }).join('') + '</div>';
+      } else {
+        medList.innerHTML = '<div style="font-size:13px;color:var(--text-light)">内服薬の登録がありません</div>';
+      }
+    }
+
+    ptInitNursingChat(p);
+    console.log('[showPatientDetailInTab] 完了:', p.name);
+  } catch(e) {
+    console.error('[showPatientDetailInTab] エラー:', e);
+    showStatus('⚠️ 患者詳細の表示に失敗しました: ' + e.message);
+  }
 }
 
 function ptInitNursingChat(p) {
