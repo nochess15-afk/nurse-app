@@ -1,7 +1,7 @@
 // ===== 設定 =====
 const SUPABASE_URL = 'https://cktxrkkeqdazcvamphhh.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNrdHhya2tlcWRhemN2YW1waGhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzNDU1MTYsImV4cCI6MjA4OTkyMTUxNn0.DlCMM0_Qu4qNSZ6znekMEmvXHXSU6QAD1wvyFFEIX78';
-const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
+const CLAUDE_MODEL = 'claude-sonnet-4-6';
 const CLAUDE_MODEL_FAST = 'claude-haiku-4-5-20251001';
 
 let currentPatient = null;
