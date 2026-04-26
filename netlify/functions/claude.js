@@ -64,10 +64,12 @@ exports.handler = async function(event, context) {
     };
     // DEBUG: サーバー側リクエスト内容ログ
     const msgs = body.messages || [];
-    const firstContent = msgs[0] && msgs[0].content ? msgs[0].content : [];
+    const rawContent = (msgs[0] && msgs[0].content) ? msgs[0].content : [];
+    // content は文字列（テキスト）または配列（マルチモーダル）のどちらもあり得る
+    const firstContent = Array.isArray(rawContent) ? rawContent : [];
     console.log('[DEBUG claude.js] model:', body.model);
     console.log('[DEBUG claude.js] max_tokens:', body.max_tokens);
-    console.log('[DEBUG claude.js] messages[0].content blocks数:', firstContent.length);
+    console.log('[DEBUG claude.js] messages[0].content type:', typeof rawContent, Array.isArray(rawContent) ? 'array len=' + rawContent.length : 'string len=' + rawContent.length);
     firstContent.forEach(function(block, i) {
       if (block.source) {
         var data100 = block.source.data ? block.source.data.substring(0, 100) : '(なし)';
