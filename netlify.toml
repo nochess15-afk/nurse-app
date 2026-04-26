@@ -4,4 +4,8 @@
 
 [functions]
   directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+[[functions]]
+  function = "claude"
   timeout = 26
