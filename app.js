@@ -3389,7 +3389,7 @@ async function generateBulkDocs(docType) {
       htmlResults.push('<div class="card" style="border-color:var(--error)"><div style="color:var(--error);font-weight:700">' + p.name + ' - エラー</div><div style="font-size:12px">' + e.message + '</div></div>');
     }
   }
-  results.innerHTML = '<div style="margin-bottom:10px;font-size:13px;color:var(--text-secondary)">' + completed + '/' + patients.length + '件生成完了</div>' + htmlResults.join('');
+  results.innerHTML = '<div style="margin-bottom:10px;font-size:13px;color:var(--text-secondary)">' + completed + '/' + patients.length + '件生成完了</div>' + htmlResults.join('') + '<p class="ai-disclaimer">⚠️ AIの出力は参考情報です。最終判断は必ず担当看護師が行ってください。</p>';
   showStatus('✅ ' + completed + '件生成しました');
 }
 
@@ -3467,7 +3467,7 @@ async function generateBulkHyoka() {
     }
   }
 
-  results.innerHTML = '<div style="margin-bottom:10px;font-size:13px;color:var(--text-secondary)">' + completed + '/' + patients.length + '件生成完了</div>' + htmlResults.join('');
+  results.innerHTML = '<div style="margin-bottom:10px;font-size:13px;color:var(--text-secondary)">' + completed + '/' + patients.length + '件生成完了</div>' + htmlResults.join('') + '<p class="ai-disclaimer">⚠️ AIの出力は参考情報です。最終判断は必ず担当看護師が行ってください。</p>';
   showStatus('✅ ' + completed + '件の評価を生成しました');
 }
 

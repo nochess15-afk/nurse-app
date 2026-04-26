@@ -330,6 +330,13 @@
     letter-spacing: 0.05em;
   }
 
+  /* AI免責表示 */
+  .ai-disclaimer {
+    font-size: 12px;
+    color: #888;
+    margin-top: 10px;
+  }
+
   /* チェックリスト */
   .checklist { list-style: none; display: flex; flex-direction: column; gap: 8px; }
   .checklist-item {

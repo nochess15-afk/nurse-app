@@ -421,6 +421,7 @@
         訪問時に確認する項目です。チェックを入れながら使用してください。
       </p>
       <ul class="checklist" id="obs-checklist"></ul>
+      <p class="ai-disclaimer">⚠️ AIの出力は参考情報です。最終判断は必ず担当看護師が行ってください。</p>
       <hr class="divider">
       <button class="btn btn-accent btn-full" onclick="savePatient()">
         💾 この患者を保存する
@@ -682,9 +683,7 @@
           </button>
         </div>
 
-        <div style="margin-top:10px;padding:10px 14px;background:#FFF8E1;border-left:4px solid #FFC107;border-radius:0 6px 6px 0;font-size:12px;color:#795548">
-          ⚠️ <strong>AIは参考情報です。</strong>判断・表現は必ず担当看護師が行ってください。A欄への反映前に必ず内容を確認・修正してください。
-        </div>
+        <p class="ai-disclaimer">⚠️ AIの出力は参考情報です。最終判断は必ず担当看護師が行ってください。</p>
       </div>
 
       <!-- 根拠・エビデンスボタン -->
@@ -695,6 +694,7 @@
         <div id="evidence-output" style="display:none;margin-top:10px;background:#f5f3ff;border:1.5px solid #c4b8f5;border-radius:var(--radius-sm);padding:14px">
           <div style="font-size:11px;font-weight:700;color:#7b68ee;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em">📚 根拠・エビデンス</div>
           <div id="evidence-content" style="font-size:13px;line-height:1.8;white-space:pre-wrap"></div>
+          <p class="ai-disclaimer">⚠️ AIの出力は参考情報です。最終判断は必ず担当看護師が行ってください。</p>
         </div>
       </div>
 
@@ -717,6 +717,7 @@
         <button class="btn btn-secondary btn-sm" style="margin-top:10px" onclick="copyText('rehab-plan-content')">
           📋 コピー
         </button>
+        <p class="ai-disclaimer">⚠️ AIの出力は参考情報です。最終判断は必ず担当看護師が行ってください。</p>
       </div>
     </div>
 
@@ -802,6 +803,7 @@
           </div>
         </div>
         <p style="font-size:11px;color:var(--text-light);margin-bottom:8px">✏️ 各項目をタップして直接編集できます</p>
+        <p class="ai-disclaimer">⚠️ AIの出力は参考情報です。最終判断は必ず担当看護師が行ってください。</p>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn btn-secondary btn-sm" onclick="copyKeikaku()">📋 コピー</button>
           <button class="btn btn-primary btn-sm" onclick="saveDocument('keikaku')">💾 保存</button>
@@ -857,6 +859,7 @@
         </div>
       </div>
       <p style="font-size:11px;color:var(--text-light);margin-bottom:8px">✏️ 各項目をタップして直接編集できます</p>
+      <p class="ai-disclaimer">⚠️ AIの出力は参考情報です。最終判断は必ず担当看護師が行ってください。</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-secondary btn-sm" onclick="copyReport()">📋 コピー</button>
         <button class="btn btn-primary btn-sm" onclick="saveDocument('hokoku')">💾 保存</button>
