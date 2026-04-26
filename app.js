@@ -125,11 +125,23 @@ async function callClaude(systemPrompt, userPrompt, useFast, temperature) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
   });
+  // レスポンスを一度だけ読む（res.json()の二重呼び出しを防ぐ）
+  const data = await res.json().catch(() => null);
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error?.message || res.statusText);
+    // エラーメッセージを確実に取り出す（文字列 or オブジェクト両対応）
+    var errMsg = (data && data.error && data.error.message)
+      ? data.error.message
+      : (data && typeof data.error === 'string')
+        ? data.error
+        : res.statusText;
+    console.error('[callClaude] APIエラー status=' + res.status + ' msg=' + errMsg, data);
+    throw new Error('APIエラー(' + res.status + '): ' + errMsg);
   }
-  const data = await res.json();
+  if (!data || !Array.isArray(data.content) || !data.content[0]) {
+    console.error('[callClaude] 予期しないレスポンス構造:', data);
+    var detail = data ? (data.error ? JSON.stringify(data.error) : JSON.stringify(data)) : '(null)';
+    throw new Error('APIレスポンスが不正です: ' + detail);
+  }
   return data.content[0].text;
 }
 
@@ -1936,11 +1948,15 @@ async function deleteVisit(id, visitDate) {
 async function generateAssessment() {
   if (!currentPatient) { showStatus('⚠️ 患者を選択してください'); return; }
 
-  const btn = event.target;
-  btn.disabled = true;
-  btn.innerHTML = '<span class="loading-dot"><span></span><span></span><span></span></span> AIが分析中...';
-
+  // btn を try の外で宣言し、取得失敗も catch できるようにする
+  var btn = null;
   try {
+    btn = event.target;
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="loading-dot"><span></span><span></span><span></span></span> AIが分析中...';
+    }
+
     const visits = await supabaseFetch('visits?patient_id=eq.' + currentPatient.id + '&order=visit_date.desc&limit=10');
     const visitText = visits.map(function(v) {
       return '【' + v.visit_date + '】\n' + (v.content || '') + (v.observations ? '\n申し送り：' + v.observations : '');
@@ -2006,10 +2022,22 @@ async function generateAssessment() {
     }
 
   } catch(e) {
-    showStatus('⚠️ AIの呼び出しに失敗しました: ' + e.message, 5000);
+    console.error('[generateAssessment] エラー:', e);
+    // ステータスバーに表示
+    showStatus('⚠️ AIの呼び出しに失敗しました: ' + e.message, 8000);
+    // assessment-output にもエラーを表示（ステータスバーを見逃した場合の保険）
+    var assessContent = document.getElementById('assessment-content');
+    var assessOut = document.getElementById('assessment-output');
+    if (assessContent) assessContent.textContent = '⚠️ エラーが発生しました\n\n' + e.message + '\n\n画面を再読み込みして再度お試しください。';
+    if (assessOut) {
+      assessOut.style.display = '';
+      assessOut.scrollIntoView({ behavior: 'smooth' });
+    }
   } finally {
-    btn.disabled = false;
-    btn.innerHTML = '🤖 AIでアセスメントを生成';
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '🤖 AIアセスメント';
+    }
   }
 }
 

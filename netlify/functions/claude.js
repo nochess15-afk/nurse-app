@@ -99,6 +99,7 @@ exports.handler = async function(event, context) {
     };
 
   } catch(e) {
+    console.error('[claude.js] 予期しないエラー:', e);
     return { statusCode: 500, headers, body: JSON.stringify({ error: e.message }) };
   }
 };
