@@ -1,8 +1,9 @@
-[functions]
-  node_bundler = "esbuild"
-  timeout = 26
+[build]
+  command = ""
+  publish = ""
 
-[[headers]]
-  for = "/.netlify/functions/*"
-    [headers.values]
-    Access-Control-Allow-Origin = "*"
+[[functions]]
+  directory = "netlify/functions"
+
+[functions]
+  timeout = 26
