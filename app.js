@@ -1719,11 +1719,12 @@ async function analyzeMedicinePhoto() {
   var file = document.getElementById('medicine-photo').files[0];
   if (!file) { showStatus('⚠️ 写真を選択してください'); return; }
 
-  var btn = event.target;
-  btn.disabled = true;
-  btn.innerHTML = '<span class="loading-dot"><span></span><span></span><span></span></span> 読み取り中...';
-
+  var btn = null;
   try {
+    btn = event.target;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="loading-dot"><span></span><span></span><span></span></span> 読み取り中...';
+
     var reader = new FileReader();
     var base64 = await new Promise(function(resolve) {
       reader.onload = function(e) { resolve(e.target.result.split(',')[1]); };
@@ -1754,7 +1755,15 @@ async function analyzeMedicinePhoto() {
       })
     });
 
-    var data = await response.json();
+    var data = await response.json().catch(function() { return null; });
+    if (!response.ok) {
+      var errMsg = (data && data.error && data.error.message) ? data.error.message
+        : (data && typeof data.error === 'string') ? data.error : response.statusText;
+      throw new Error('APIエラー(' + response.status + '): ' + errMsg);
+    }
+    if (!data || !Array.isArray(data.content) || !data.content[0]) {
+      throw new Error('APIレスポンスが不正です: ' + (data ? JSON.stringify(data.error || data) : '(null)'));
+    }
     var rawText = data.content[0].text;
 
     // JSON配列としてパース（失敗時は行分割でフォールバック）
@@ -1798,10 +1807,10 @@ async function analyzeMedicinePhoto() {
     document.getElementById('medicine-photo-name').textContent = 'ファイル未選択';
 
   } catch(e) {
+    console.error('[analyzeMedicinePhoto] エラー:', e);
     showStatus('⚠️ 読み取りに失敗しました: ' + e.message, 5000);
   } finally {
-    btn.disabled = false;
-    btn.innerHTML = '🤖 AIで読み取る';
+    if (btn) { btn.disabled = false; btn.innerHTML = '🤖 AIで読み取る'; }
   }
 }
 
