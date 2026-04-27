@@ -865,35 +865,81 @@ async function initFirstVisitChecklist() {
 
   try {
     var visits = await supabaseFetch('visits?patient_id=eq.' + currentPatient.id + '&limit=1');
-    if (visits.length > 0) return; // 2回目以降は表示しない
+    if (visits.length > 0) return;
 
-    var rawItems = currentPatient.observation_items || '';
-    var items = rawItems.split('\n').map(function(s) { return s.trim(); }).filter(Boolean);
-    if (!items.length) return;
-
-    window._checklistItems = items;
-    renderFirstVisitChecklist(items);
     el.style.display = '';
+    var itemsContainer = document.getElementById('first-visit-checklist-items');
+    var outputBtn = document.getElementById('checklist-output-btn');
+    if (itemsContainer) itemsContainer.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-secondary);font-size:13px">🤖 AIが観察項目を生成中...</div>';
+    if (outputBtn) outputBtn.style.display = 'none';
+
+    var systemPrompt = 'あなたは訪問看護師の初診時観察を支援するAIです。\n患者の主病名・既往歴・医療処置から、初診時に確認すべき観察項目をJSON配列で返してください。\n\n各項目は以下のフォーマットで返してください：\n[\n  {\n    "category": "カテゴリ名（例：循環、呼吸、疼痛、ADL、環境など）",\n    "label": "観察項目名（簡潔に）",\n    "type": "yesno_with_detail" または "text" または "scale",\n    "detail_placeholder": "詳細入力欄のplaceholder（yesno_with_detailのみ）",\n    "scale_max": 10\n  }\n]\n\n【typeの使い分け】\n- yesno_with_detail：あり/なし で答えられ、詳細も記録したい項目（浮腫、呼吸困難など）\n- text：自由記述が適切な項目（生活環境、家族構成など）\n- scale：0〜10のスケールで評価する項目（疼痛NRS、倦怠感など）\n\n【注意】\n- カテゴリは5〜8種類にまとめる\n- 1カテゴリあたり3〜6項目\n- 合計20〜35項目\n- JSONのみ返す（説明文不要）';
+
+    var userPrompt = '主病名：' + (currentPatient.main_diagnosis || '不明') + '\n既往歴：' + (currentPatient.medical_history || 'なし') + '\n医療処置：' + (currentPatient.medical_procedures || 'なし');
+
+    var resultText = await callClaude(systemPrompt, userPrompt, false);
+
+    var jsonMatch = resultText.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) throw new Error('JSON形式のレスポンスが得られませんでした');
+    var checklistData = JSON.parse(jsonMatch[0]);
+    if (!Array.isArray(checklistData) || !checklistData.length) throw new Error('項目が空です');
+
+    window._checklistData = checklistData;
+    renderFirstVisitChecklist(checklistData);
+    if (outputBtn) outputBtn.style.display = '';
   } catch(e) {
     console.error('[initFirstVisitChecklist]', e);
+    var itemsContainer2 = document.getElementById('first-visit-checklist-items');
+    if (itemsContainer2) itemsContainer2.innerHTML = '<div style="padding:16px;color:#c62828;font-size:13px">⚠️ 観察項目の生成に失敗しました: ' + escHtml(e.message) + '</div>';
   }
 }
 
-function renderFirstVisitChecklist(items) {
+function renderFirstVisitChecklist(data) {
   var container = document.getElementById('first-visit-checklist-items');
   if (!container) return;
-  container.innerHTML = items.map(function(item, i) {
-    return '<div data-checklist-row data-idx="' + i + '" style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">' +
-      '<div style="flex:1;font-size:13px;line-height:1.5;padding-top:5px">' + escHtml(item) + '</div>' +
-      '<div style="display:flex;flex-direction:column;gap:6px;min-width:160px">' +
-        '<div style="display:flex;gap:6px">' +
-          '<button class="checklist-ari-btn" data-idx="' + i + '" data-selected="false" onclick="toggleChecklistBtn(this,\'あり\')" style="flex:1;padding:6px 4px;font-size:12px;border:1.5px solid var(--border);border-radius:6px;background:white;cursor:pointer">あり</button>' +
-          '<button class="checklist-nashi-btn" data-idx="' + i + '" data-selected="false" onclick="toggleChecklistBtn(this,\'なし\')" style="flex:1;padding:6px 4px;font-size:12px;border:1.5px solid var(--border);border-radius:6px;background:white;cursor:pointer">なし</button>' +
-        '</div>' +
-        '<input type="text" class="checklist-text-input" data-idx="' + i + '" placeholder="詳細..." style="font-size:12px;padding:5px 8px;border:1.5px solid var(--border);border-radius:6px;width:100%;box-sizing:border-box">' +
-      '</div>' +
-    '</div>';
-  }).join('');
+
+  var categories = [];
+  var categoryMap = {};
+  data.forEach(function(item, i) {
+    var cat = item.category || 'その他';
+    if (!categoryMap[cat]) { categoryMap[cat] = []; categories.push(cat); }
+    categoryMap[cat].push({ item: item, idx: i });
+  });
+
+  var html = '';
+  categories.forEach(function(cat) {
+    html += '<div style="margin-bottom:18px">';
+    html += '<div style="font-size:13px;font-weight:700;color:var(--primary);margin-bottom:8px;padding-bottom:4px;border-bottom:2px solid var(--primary-light,#e3f2fd)">■ ' + escHtml(cat) + '</div>';
+    categoryMap[cat].forEach(function(entry) {
+      var item = entry.item;
+      var i = entry.idx;
+      html += '<div data-checklist-row data-idx="' + i + '" data-category="' + escHtml(cat) + '" data-label="' + escHtml(item.label) + '" data-type="' + escHtml(item.type) + '" style="padding:8px 0;border-bottom:1px solid var(--border)">';
+      html += '<div style="font-size:13px;margin-bottom:6px">' + escHtml(item.label) + '</div>';
+
+      if (item.type === 'yesno_with_detail') {
+        var ph = item.detail_placeholder || '詳細...';
+        html += '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">';
+        html += '<button class="checklist-ari-btn" data-idx="' + i + '" data-selected="false" onclick="toggleChecklistBtn(this,\'あり\')" style="padding:5px 14px;font-size:12px;border:1.5px solid var(--border);border-radius:6px;background:white;cursor:pointer">あり</button>';
+        html += '<button class="checklist-nashi-btn" data-idx="' + i + '" data-selected="false" onclick="toggleChecklistBtn(this,\'なし\')" style="padding:5px 14px;font-size:12px;border:1.5px solid var(--border);border-radius:6px;background:white;cursor:pointer">なし</button>';
+        html += '<input type="text" class="checklist-detail-input" data-idx="' + i + '" placeholder="' + escHtml(ph) + '" style="flex:1;min-width:120px;font-size:12px;padding:5px 8px;border:1.5px solid var(--border);border-radius:6px;box-sizing:border-box">';
+        html += '</div>';
+      } else if (item.type === 'text') {
+        html += '<input type="text" class="checklist-text-input" data-idx="' + i + '" placeholder="記入..." style="width:100%;font-size:12px;padding:5px 8px;border:1.5px solid var(--border);border-radius:6px;box-sizing:border-box">';
+      } else if (item.type === 'scale') {
+        var scaleMax = item.scale_max || 10;
+        html += '<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center">';
+        for (var s = 0; s <= scaleMax; s++) {
+          html += '<button class="checklist-scale-btn" data-idx="' + i + '" data-value="' + s + '" data-selected="false" onclick="selectScaleBtn(this)" style="width:32px;height:32px;font-size:12px;border:1.5px solid var(--border);border-radius:6px;background:white;cursor:pointer">' + s + '</button>';
+        }
+        html += '</div>';
+      }
+
+      html += '</div>';
+    });
+    html += '</div>';
+  });
+
+  container.innerHTML = html;
 }
 
 function toggleChecklistBtn(btn, value) {
@@ -903,7 +949,6 @@ function toggleChecklistBtn(btn, value) {
   var nashiBtn = container.querySelector('.checklist-nashi-btn[data-idx="' + idx + '"]');
   var isSelected = btn.getAttribute('data-selected') === 'true';
 
-  // 両方リセット
   [ariBtn, nashiBtn].forEach(function(b) {
     if (!b) return;
     b.setAttribute('data-selected', 'false');
@@ -929,32 +974,78 @@ function toggleChecklistBtn(btn, value) {
   }
 }
 
+function selectScaleBtn(btn) {
+  var idx = btn.getAttribute('data-idx');
+  var container = document.getElementById('first-visit-checklist-items');
+  var isSelected = btn.getAttribute('data-selected') === 'true';
+
+  container.querySelectorAll('.checklist-scale-btn[data-idx="' + idx + '"]').forEach(function(b) {
+    b.setAttribute('data-selected', 'false');
+    b.style.background = 'white';
+    b.style.borderColor = 'var(--border)';
+    b.style.color = '';
+    b.style.fontWeight = '';
+  });
+
+  if (!isSelected) {
+    btn.setAttribute('data-selected', 'true');
+    btn.style.background = '#e3f2fd';
+    btn.style.borderColor = '#1565c0';
+    btn.style.color = '#1565c0';
+    btn.style.fontWeight = '700';
+  }
+}
+
 function outputChecklistToContent() {
   var container = document.getElementById('first-visit-checklist-items');
   if (!container) return;
-  var items = window._checklistItems || [];
-  var lines = [];
+  var data = window._checklistData || [];
+
+  var categoryLines = {};
+  var categoryOrder = [];
 
   container.querySelectorAll('[data-checklist-row]').forEach(function(row) {
     var idx = parseInt(row.getAttribute('data-idx'));
-    var item = items[idx] || '';
-    var ariBtn = row.querySelector('.checklist-ari-btn');
-    var nashiBtn = row.querySelector('.checklist-nashi-btn');
-    var textInput = row.querySelector('.checklist-text-input');
+    var cat = row.getAttribute('data-category') || 'その他';
+    var label = row.getAttribute('data-label') || '';
+    var type = row.getAttribute('data-type') || '';
+    var line = null;
 
-    var selected = '';
-    if (ariBtn && ariBtn.getAttribute('data-selected') === 'true') selected = 'あり';
-    else if (nashiBtn && nashiBtn.getAttribute('data-selected') === 'true') selected = 'なし';
-    var freeText = textInput ? textInput.value.trim() : '';
+    if (type === 'yesno_with_detail') {
+      var ariBtn = row.querySelector('.checklist-ari-btn');
+      var nashiBtn = row.querySelector('.checklist-nashi-btn');
+      var detailInput = row.querySelector('.checklist-detail-input');
+      var selected = '';
+      if (ariBtn && ariBtn.getAttribute('data-selected') === 'true') selected = 'あり';
+      else if (nashiBtn && nashiBtn.getAttribute('data-selected') === 'true') selected = 'なし';
+      var detail = detailInput ? detailInput.value.trim() : '';
+      if (selected || detail) {
+        line = '・' + label + '：' + selected + (detail ? '（' + detail + '）' : '');
+      }
+    } else if (type === 'text') {
+      var textInput = row.querySelector('.checklist-text-input');
+      var val = textInput ? textInput.value.trim() : '';
+      if (val) line = '・' + label + '：' + val;
+    } else if (type === 'scale') {
+      var scaleSelected = row.querySelector('.checklist-scale-btn[data-selected="true"]');
+      if (scaleSelected) line = '・' + label + '：' + scaleSelected.getAttribute('data-value') + '/10';
+    }
 
-    if (!selected && !freeText) return;
-    var line = item + '：' + selected + (freeText ? (selected ? '（' + freeText + '）' : freeText) : '');
-    lines.push(line);
+    if (line) {
+      if (!categoryLines[cat]) { categoryLines[cat] = []; categoryOrder.push(cat); }
+      categoryLines[cat].push(line);
+    }
   });
 
-  if (!lines.length) { showStatus('⚠️ 入力されている項目がありません'); return; }
+  if (!categoryOrder.length) { showStatus('⚠️ 入力されている項目がありません'); return; }
 
-  var output = lines.join('\n');
+  var parts = ['【初診時観察】'];
+  categoryOrder.forEach(function(cat) {
+    parts.push('■ ' + cat);
+    categoryLines[cat].forEach(function(l) { parts.push(l); });
+  });
+  var output = parts.join('\n');
+
   var contentEl = document.getElementById('visit-content');
   if (!contentEl) return;
 
@@ -966,6 +1057,9 @@ function outputChecklistToContent() {
   } else {
     contentEl.value = (current ? current + '\n\n' : '') + output;
   }
+
+  var el = document.getElementById('first-visit-checklist');
+  if (el) el.style.display = 'none';
   contentEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
   showStatus('✅ O欄にチェックリストを出力しました');
 }
