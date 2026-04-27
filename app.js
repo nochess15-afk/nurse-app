@@ -109,13 +109,13 @@ function anonymize(text) {
   return text;
 }
 
-async function callClaude(systemPrompt, userPrompt, useFast, temperature) {
+async function callClaude(systemPrompt, userPrompt, useFast, temperature, maxTokens) {
   // APIに送る前に匿名化
   var anonUserPrompt = anonymize(userPrompt);
   var model = useFast ? CLAUDE_MODEL_FAST : CLAUDE_MODEL;
   var body = {
     model: model,
-    max_tokens: 2000,
+    max_tokens: maxTokens || 2000,
     system: systemPrompt,
     messages: [{ role: 'user', content: anonUserPrompt }]
   };
@@ -897,7 +897,7 @@ async function initFirstVisitChecklist() {
 
     var userPrompt = '主病名：' + (currentPatient.main_diagnosis || '不明') + '\n既往歴：' + (currentPatient.medical_history || 'なし') + '\n医療処置：' + (currentPatient.medical_procedures || 'なし');
 
-    var resultText = await callClaude(systemPrompt, userPrompt, false);
+    var resultText = await callClaude(systemPrompt, userPrompt, false, undefined, 4096);
 
     var checklistData = await parseChecklist(resultText);
     if (!Array.isArray(checklistData) || !checklistData.length) throw new Error('項目が空です');
