@@ -873,15 +873,25 @@ async function initFirstVisitChecklist() {
     if (itemsContainer) itemsContainer.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-secondary);font-size:13px">🤖 AIが観察項目を生成中...</div>';
     if (outputBtn) outputBtn.style.display = 'none';
 
-    var systemPrompt = 'あなたは訪問看護師の初診時観察を支援するAIです。\n患者の主病名・既往歴・医療処置から、初診時に確認すべき観察項目をJSON配列で返してください。\n\n各項目は以下のフォーマットで返してください：\n[\n  {\n    "category": "カテゴリ名（例：循環、呼吸、疼痛、ADL、環境など）",\n    "label": "観察項目名（簡潔に）",\n    "type": "yesno_with_detail" または "text" または "scale",\n    "detail_placeholder": "詳細入力欄のplaceholder（yesno_with_detailのみ）",\n    "scale_max": 10\n  }\n]\n\n【typeの使い分け】\n- yesno_with_detail：あり/なし で答えられ、詳細も記録したい項目（浮腫、呼吸困難など）\n- text：自由記述が適切な項目（生活環境、家族構成など）\n- scale：0〜10のスケールで評価する項目（疼痛NRS、倦怠感など）\n\n【注意】\n- カテゴリは5〜8種類にまとめる\n- 1カテゴリあたり3〜6項目\n- 合計20〜35項目\n- JSONのみ返す（説明文不要）';
+    var systemPrompt = 'あなたは訪問看護師の初診時観察を支援するAIです。\n患者の主病名・既往歴・医療処置から、初診時に確認すべき観察項目をJSON配列で返してください。\n\n各項目は以下のフォーマットで返してください：\n[\n  {\n    "category": "カテゴリ名（例：循環、呼吸、疼痛、ADL、環境など）",\n    "label": "観察項目名（簡潔に）",\n    "type": "yesno_with_detail" または "text" または "scale",\n    "detail_placeholder": "詳細入力欄のplaceholder（yesno_with_detailのみ）",\n    "scale_max": 10\n  }\n]\n\n【typeの使い分け】\n- yesno_with_detail：あり/なし で答えられ、詳細も記録したい項目（浮腫、呼吸困難など）\n- text：自由記述が適切な項目（生活環境、家族構成など）\n- scale：0〜10のスケールで評価する項目（疼痛NRS、倦怠感など）\n\n【注意】\n- カテゴリは5〜8種類にまとめる\n- 1カテゴリあたり3〜6項目\n- 合計20〜35項目\n- JSONのみ返す（説明文不要）\n\n重要：JSONの配列のみを返すこと。バッククォート、コードブロック、説明文、前置き、改行以外の文字を一切含めないこと。';
 
     var userPrompt = '主病名：' + (currentPatient.main_diagnosis || '不明') + '\n既往歴：' + (currentPatient.medical_history || 'なし') + '\n医療処置：' + (currentPatient.medical_procedures || 'なし');
 
     var resultText = await callClaude(systemPrompt, userPrompt, false);
 
-    var jsonMatch = resultText.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) throw new Error('JSON形式のレスポンスが得られませんでした');
-    var checklistData = JSON.parse(jsonMatch[0]);
+    var cleaned = resultText.replace(/```json|```/g, '').trim();
+    var jsonMatch = cleaned.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) {
+      console.error('[initFirstVisitChecklist] パース失敗。レスポンス全文:', resultText);
+      throw new Error('JSON形式のレスポンスが得られませんでした。しばらくしてから再試行してください。');
+    }
+    var checklistData;
+    try {
+      checklistData = JSON.parse(jsonMatch[0]);
+    } catch(parseErr) {
+      console.error('[initFirstVisitChecklist] JSONパースエラー。レスポンス全文:', resultText);
+      throw new Error('JSONのパースに失敗しました。しばらくしてから再試行してください。');
+    }
     if (!Array.isArray(checklistData) || !checklistData.length) throw new Error('項目が空です');
 
     window._checklistData = checklistData;
