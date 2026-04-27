@@ -86,7 +86,7 @@ exports.handler = async function(event, context) {
       apiHeaders,
       {
         model: body.model,
-        max_tokens: body.max_tokens || 2000,
+        max_tokens: body.max_tokens || 2048,
         system: body.system,
         messages: body.messages
       }
