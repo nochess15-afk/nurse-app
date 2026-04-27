@@ -522,6 +522,16 @@
     </div>
     <button class="btn btn-secondary btn-sm" onclick="showKarteView()" style="margin-bottom:16px">← カルテに戻る</button>
 
+    <!-- 初診チェックリスト（訪問記録0件の患者のみ表示） -->
+    <div id="first-visit-checklist" class="card" style="display:none;border-left:4px solid var(--primary)">
+      <div class="card-title">📋 初診チェックリスト</div>
+      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:4px">初めての訪問です。観察項目ごとに確認してください。</p>
+      <p style="font-size:12px;color:var(--text-light);margin-bottom:14px">あり／なし未選択・記入なしの項目は出力されません。</p>
+      <div id="first-visit-checklist-items"></div>
+      <hr class="divider">
+      <button class="btn btn-primary btn-full" onclick="outputChecklistToContent()">📝 O欄に出力</button>
+    </div>
+
     <div class="card">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
         <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">

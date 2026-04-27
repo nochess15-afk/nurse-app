@@ -853,6 +853,121 @@ function showRecordView() {
   document.getElementById('view-karte').style.display = 'none';
   document.getElementById('view-record').style.display = '';
   restoreDraftFromLocal();
+  initFirstVisitChecklist();
+}
+
+// ===== 初診チェックリスト =====
+async function initFirstVisitChecklist() {
+  var el = document.getElementById('first-visit-checklist');
+  if (!el) return;
+  el.style.display = 'none';
+  if (!currentPatient) return;
+
+  try {
+    var visits = await supabaseFetch('visits?patient_id=eq.' + currentPatient.id + '&limit=1');
+    if (visits.length > 0) return; // 2回目以降は表示しない
+
+    var rawItems = currentPatient.observation_items || '';
+    var items = rawItems.split('\n').map(function(s) { return s.trim(); }).filter(Boolean);
+    if (!items.length) return;
+
+    window._checklistItems = items;
+    renderFirstVisitChecklist(items);
+    el.style.display = '';
+  } catch(e) {
+    console.error('[initFirstVisitChecklist]', e);
+  }
+}
+
+function renderFirstVisitChecklist(items) {
+  var container = document.getElementById('first-visit-checklist-items');
+  if (!container) return;
+  container.innerHTML = items.map(function(item, i) {
+    return '<div data-checklist-row data-idx="' + i + '" style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">' +
+      '<div style="flex:1;font-size:13px;line-height:1.5;padding-top:5px">' + escHtml(item) + '</div>' +
+      '<div style="display:flex;flex-direction:column;gap:6px;min-width:160px">' +
+        '<div style="display:flex;gap:6px">' +
+          '<button class="checklist-ari-btn" data-idx="' + i + '" data-selected="false" onclick="toggleChecklistBtn(this,\'あり\')" style="flex:1;padding:6px 4px;font-size:12px;border:1.5px solid var(--border);border-radius:6px;background:white;cursor:pointer">あり</button>' +
+          '<button class="checklist-nashi-btn" data-idx="' + i + '" data-selected="false" onclick="toggleChecklistBtn(this,\'なし\')" style="flex:1;padding:6px 4px;font-size:12px;border:1.5px solid var(--border);border-radius:6px;background:white;cursor:pointer">なし</button>' +
+        '</div>' +
+        '<input type="text" class="checklist-text-input" data-idx="' + i + '" placeholder="詳細..." style="font-size:12px;padding:5px 8px;border:1.5px solid var(--border);border-radius:6px;width:100%;box-sizing:border-box">' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function toggleChecklistBtn(btn, value) {
+  var idx = btn.getAttribute('data-idx');
+  var container = document.getElementById('first-visit-checklist-items');
+  var ariBtn = container.querySelector('.checklist-ari-btn[data-idx="' + idx + '"]');
+  var nashiBtn = container.querySelector('.checklist-nashi-btn[data-idx="' + idx + '"]');
+  var isSelected = btn.getAttribute('data-selected') === 'true';
+
+  // 両方リセット
+  [ariBtn, nashiBtn].forEach(function(b) {
+    if (!b) return;
+    b.setAttribute('data-selected', 'false');
+    b.style.background = 'white';
+    b.style.borderColor = 'var(--border)';
+    b.style.color = '';
+    b.style.fontWeight = '';
+  });
+
+  if (!isSelected) {
+    btn.setAttribute('data-selected', 'true');
+    if (value === 'あり') {
+      btn.style.background = '#e8f5e9';
+      btn.style.borderColor = '#2e7d32';
+      btn.style.color = '#2e7d32';
+      btn.style.fontWeight = '700';
+    } else {
+      btn.style.background = '#f5f5f5';
+      btn.style.borderColor = '#9e9e9e';
+      btn.style.color = '#616161';
+      btn.style.fontWeight = '700';
+    }
+  }
+}
+
+function outputChecklistToContent() {
+  var container = document.getElementById('first-visit-checklist-items');
+  if (!container) return;
+  var items = window._checklistItems || [];
+  var lines = [];
+
+  container.querySelectorAll('[data-checklist-row]').forEach(function(row) {
+    var idx = parseInt(row.getAttribute('data-idx'));
+    var item = items[idx] || '';
+    var ariBtn = row.querySelector('.checklist-ari-btn');
+    var nashiBtn = row.querySelector('.checklist-nashi-btn');
+    var textInput = row.querySelector('.checklist-text-input');
+
+    var selected = '';
+    if (ariBtn && ariBtn.getAttribute('data-selected') === 'true') selected = 'あり';
+    else if (nashiBtn && nashiBtn.getAttribute('data-selected') === 'true') selected = 'なし';
+    var freeText = textInput ? textInput.value.trim() : '';
+
+    if (!selected && !freeText) return;
+    var line = item + '：' + selected + (freeText ? (selected ? '（' + freeText + '）' : freeText) : '');
+    lines.push(line);
+  });
+
+  if (!lines.length) { showStatus('⚠️ 入力されている項目がありません'); return; }
+
+  var output = lines.join('\n');
+  var contentEl = document.getElementById('visit-content');
+  if (!contentEl) return;
+
+  var current = contentEl.value;
+  var oMarker = '【O：客観的情報】';
+  if (current.includes(oMarker)) {
+    var oIdx = current.indexOf(oMarker) + oMarker.length;
+    contentEl.value = current.substring(0, oIdx) + '\n' + output + current.substring(oIdx);
+  } else {
+    contentEl.value = (current ? current + '\n\n' : '') + output;
+  }
+  contentEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  showStatus('✅ O欄にチェックリストを出力しました');
 }
 
 // ===== 共通必須観察項目（疾患問わず毎回確認） =====
