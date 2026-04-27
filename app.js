@@ -2694,9 +2694,10 @@ async function analyzeDocument() {
         allText += tc.items.map(function(i) { return i.str; }).join(' ') + '\n';
       }
       allText = allText.trim();
+      console.log('[analyzeDocument] PDF抽出テキスト全文:', allText);
       console.log('[analyzeDocument] PDF抽出テキスト長=', allText.length, '先頭200:', allText.substring(0, 200));
 
-      if (allText.length < 100) {
+      if (allText.length < 50) {
         loadWrap.remove();
         docChatAddMessage('ai', '⚠️ 手書きPDFは自動読み取りに対応していません。手動で入力してください。');
         return;
