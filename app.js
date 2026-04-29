@@ -1725,30 +1725,56 @@ async function analyzeMedicinePhoto() {
     btn.disabled = true;
     btn.innerHTML = '<span class="loading-dot"><span></span><span></span><span></span></span> 読み取り中...';
 
-    var reader = new FileReader();
-    var base64 = await new Promise(function(resolve) {
-      reader.onload = function(e) { resolve(e.target.result.split(',')[1]); };
-      reader.readAsDataURL(file);
+    // 画像前処理: グレースケール変換 + コントラスト強化 + 長辺2048px
+    var base64 = await new Promise(function(resolve, reject) {
+      var img = new Image();
+      var objectUrl = URL.createObjectURL(file);
+      img.onload = function() {
+        URL.revokeObjectURL(objectUrl);
+        var MAX = 2048;
+        var w = img.naturalWidth, h = img.naturalHeight;
+        if (w > MAX || h > MAX) {
+          if (w >= h) { h = Math.round(h * MAX / w); w = MAX; }
+          else { w = Math.round(w * MAX / h); h = MAX; }
+        }
+        var canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        var imgData = ctx.getImageData(0, 0, w, h);
+        var d = imgData.data;
+        for (var i = 0; i < d.length; i += 4) {
+          // グレースケール
+          var gray = Math.round((d[i] + d[i+1] + d[i+2]) / 3);
+          // コントラスト強化（128中心に1.5倍伸張）
+          gray = Math.min(255, Math.max(0, Math.round((gray - 128) * 1.5 + 128)));
+          d[i] = d[i+1] = d[i+2] = gray;
+        }
+        ctx.putImageData(imgData, 0, 0);
+        var dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+        resolve(dataUrl.split(',')[1]);
+      };
+      img.onerror = reject;
+      img.src = objectUrl;
     });
-
-    var mediaType = file.type || 'image/jpeg';
 
     var response = await fetch('/.netlify/functions/claude', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: CLAUDE_MODEL_FAST,
+        model: 'claude-opus-4-5',
         max_tokens: 1000,
+        system: 'You are an OCR system reading a Japanese お薬手帳. Your only job is to copy text exactly as printed. Never guess or invent characters.',
         messages: [{
           role: 'user',
           content: [
             {
               type: 'image',
-              source: { type: 'base64', media_type: mediaType, data: base64 }
+              source: { type: 'base64', media_type: 'image/jpeg', data: base64 }
             },
             {
               type: 'text',
-              text: 'このお薬手帳の画像から内服薬の一覧を読み取り、1薬剤1要素のJSON配列で返してください。形式: ["薬剤名 用量 用法", "薬剤名 用量 用法", ...]\n前置き・説明は不要。読み取れない場合は空配列[]を返してください。'
+              text: 'Extract all medications from this お薬手帳 photo.\nReturn ONLY a JSON array. Each element = one medication.\nFormat: ["drug name dose instructions", ...]\n\nSTRICT RULES:\n- Copy each drug name character by character from the image\n- Never substitute similar-looking characters with guesses\n- If a character is truly unreadable, use ？\n- Include: drug name + dose (mg/枚/mL) + frequency (1日〇回) + timing (朝食後/就寝前 etc.)\n- Exclude: pharmacy info, doctor name, dates, patient name'
             }
           ]
         }]
