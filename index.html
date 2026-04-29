@@ -370,7 +370,7 @@
         <div class="form-group full">
           <label>📷 お薬手帳から読み取る</label>
           <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap">
-            <input type="file" id="medicine-photo" accept="image/*" capture="environment" style="display:none" onchange="readMedicinePhoto()">
+            <input type="file" id="medicine-photo" accept="image/*" style="display:none" onchange="readMedicinePhoto()">
             <button class="btn btn-secondary" onclick="document.getElementById('medicine-photo').click()">
               📷 写真を撮影・選択
             </button>
@@ -525,11 +525,11 @@
     <!-- 初診チェックリスト（訪問記録0件の患者のみ表示） -->
     <div id="first-visit-checklist" class="card" style="display:none;border-left:4px solid var(--primary)">
       <div class="card-title">📋 初診チェックリスト</div>
-      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:4px">初めての訪問です。観察項目ごとに確認してください。</p>
-      <p style="font-size:12px;color:var(--text-light);margin-bottom:14px">あり／なし未選択・記入なしの項目は出力されません。</p>
+      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:4px">初めての訪問です。AIが生成した観察項目を確認してください。</p>
+      <p style="font-size:12px;color:var(--text-light);margin-bottom:14px">未入力・未選択の項目は出力されません。</p>
       <div id="first-visit-checklist-items"></div>
       <hr class="divider">
-      <button class="btn btn-primary btn-full" onclick="outputChecklistToContent()">📝 O欄に出力</button>
+      <button id="checklist-output-btn" class="btn btn-primary btn-full" onclick="outputChecklistToContent()" style="display:none">📝 O欄に出力</button>
     </div>
 
     <div class="card">
