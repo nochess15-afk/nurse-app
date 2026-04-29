@@ -1817,6 +1817,16 @@ async function analyzeMedicinePhoto() {
     // 各要素をオブジェクト→文字列に正規化
     newMeds = newMeds.map(normalizeMedItem).filter(Boolean);
 
+    // オブジェクト混入の最終防衛
+    newMeds = newMeds.map(function(item) {
+      if (typeof item === 'string') return item.trim();
+      if (item && typeof item === 'object') {
+        return [item.name, item.drug_name, item.drug, item.medication, item['薬剤名']]
+          .filter(Boolean)[0] || JSON.stringify(item);
+      }
+      return String(item);
+    }).filter(Boolean);
+
     // 既存行と結合
     var currentArr = parseMedicinesList(getMedicinesFromRows('reg-medicines-rows'));
     var combined = currentArr.concat(newMeds);
