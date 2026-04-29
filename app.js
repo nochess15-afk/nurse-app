@@ -1801,6 +1801,16 @@ async function analyzeMedicinePhoto() {
     if (!newMeds.length) {
       newMeds = rawText.split('\n').map(function(l) { return l.replace(/^\d+[\.\)]\s*/, '').trim(); }).filter(Boolean);
     }
+    // 各要素をオブジェクト→文字列に正規化
+    newMeds = newMeds.map(function(item) {
+      if (typeof item === 'string') return item.trim();
+      if (item && typeof item === 'object') {
+        // { name, dose, instructions } 等の形に対応
+        return [item.name || item.drug_name || item.drug || '', item.dose || item.dosage || '', item.instructions || item.frequency || item.timing || item.usage || '']
+          .map(function(s) { return String(s).trim(); }).filter(Boolean).join(' ');
+      }
+      return String(item).trim();
+    }).filter(Boolean);
 
     // 既存行と結合
     var currentArr = parseMedicinesList(getMedicinesFromRows('reg-medicines-rows'));
