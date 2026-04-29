@@ -669,6 +669,15 @@ async function loadPatients() {
     var patients = await supabaseFetch('patients?order=name.asc');
     // 内服薬フォーマットを自動マイグレーション
     patients.forEach(migrateMedicinesIfNeeded);
+    // [object Object]混入データを自動クリア
+    patients.forEach(function(p) {
+      if (p.medicines && String(p.medicines).includes('[object Object]')) {
+        console.warn('[loadPatients] [object Object]検出 患者:', p.name, '→ クリア');
+        p.medicines = '[]';
+        supabaseFetch('patients?id=eq.' + p.id, 'PATCH', { medicines: '[]' })
+          .catch(function(e) { console.warn('[loadPatients] クリアPATCH失敗:', e); });
+      }
+    });
     // 全患者をキャッシュ
     window.allPatientsCache = patients;
     window.allPatientsForList = patients;
@@ -1365,6 +1374,15 @@ function normalizeMedItem(x) {
   return String(x).trim();
 }
 
+// Supabase保存前に medicines を正規化して JSON 文字列で返す
+function normalizeMedicinesForSave(medicines) {
+  var arr = parseMedicinesList(medicines || '');
+  arr = arr.map(normalizeMedItem).filter(function(s) {
+    return s && s !== '[object Object]' && !/^\[object/.test(s);
+  });
+  return arr.length ? JSON.stringify(arr) : null;
+}
+
 // 内服薬を配列に変換（配列/JSON文字列/区切り文字列すべて対応）
 function parseMedicinesList(val) {
   if (!val) return [];
@@ -1638,7 +1656,7 @@ async function savePatient() {
     const rehabilitation = document.getElementById('reg-rehabilitation').value.trim();
     const keyPerson = document.getElementById('reg-key-person') ? document.getElementById('reg-key-person').value.trim() : '';
     const emergencyContact = document.getElementById('reg-emergency-contact') ? document.getElementById('reg-emergency-contact').value.trim() : '';
-    const medicines = getMedicinesFromRows('reg-medicines-rows');
+    const medicines = normalizeMedicinesForSave(getMedicinesFromRows('reg-medicines-rows'));
     var allObsItems = COMMON_ITEMS.slice();
     var diseaseObsResult = getDiseaseItems(mainDiagnosis);
     if (diseaseObsResult) allObsItems = allObsItems.concat(diseaseObsResult.items);
@@ -2687,7 +2705,7 @@ async function saveMedicines() {
 
 async function saveMedicinesSide() {
   if (!currentPatient) return;
-  var medicines = getMedicinesFromRows('medicine-edit-rows-side');
+  var medicines = normalizeMedicinesForSave(getMedicinesFromRows('medicine-edit-rows-side'));
 
   try {
     await supabaseFetch('patients?id=eq.' + currentPatient.id, 'PATCH', { medicines: medicines || null });
@@ -2822,7 +2840,7 @@ async function savePatientOnly() {
     const dementia2 = document.getElementById('reg-dementia').value.trim();
     const notes = document.getElementById('reg-notes').value.trim();
     const rehabilitation2 = document.getElementById('reg-rehabilitation').value.trim();
-    const medicines = getMedicinesFromRows('reg-medicines-rows');
+    const medicines = normalizeMedicinesForSave(getMedicinesFromRows('reg-medicines-rows'));
     const keyPerson2 = document.getElementById('reg-key-person') ? document.getElementById('reg-key-person').value.trim() : '';
     const emergencyContact2 = document.getElementById('reg-emergency-contact') ? document.getElementById('reg-emergency-contact').value.trim() : '';
     const payload = {
