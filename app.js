@@ -609,7 +609,19 @@ async function splitMedicinesWithClaude(patient, rawStr) {
     if (!jsonMatch) throw new Error('JSON配列が見つかりません');
     var arr = JSON.parse(jsonMatch[0]);
     if (!Array.isArray(arr) || !arr.length) throw new Error('空の配列');
-    var cleaned = arr.map(function(x) { return String(x).trim(); }).filter(Boolean);
+    arr = arr.map(function(item) {
+      if (typeof item === 'string') return item.trim();
+      if (item && typeof item === 'object') {
+        var parts = [
+          item.name || item.drug_name || item.drug || item.medication || item['薬剤名'] || '',
+          item.dose || item.dosage || item.strength || item['用量'] || '',
+          item.usage || item.instructions || item.frequency || item['用法'] || ''
+        ];
+        return parts.filter(Boolean).join(' ').trim();
+      }
+      return String(item);
+    }).filter(Boolean);
+    var cleaned = arr;
     var newVal = JSON.stringify(cleaned);
     patient.medicines = newVal;
     supabaseFetch('patients?id=eq.' + patient.id, 'PATCH', { medicines: newVal })
