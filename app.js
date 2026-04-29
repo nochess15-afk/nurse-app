@@ -1352,12 +1352,25 @@ function adlJsonToText(str) {
   return Object.keys(obj).map(function(k) { return k + '：' + obj[k]; }).join('、');
 }
 
+// 薬剤要素（文字列またはオブジェクト）を文字列に正規化
+function normalizeMedItem(x) {
+  if (typeof x === 'string') return x.trim();
+  if (x && typeof x === 'object') {
+    var name = x.name || x.drug_name || x.drug || x.medication || x.medicine || x['薬剤名'] || '';
+    var dose = x.dose || x.dosage || x.strength || x['用量'] || '';
+    var usage = x.instructions || x.frequency || x.timing || x.usage || x.direction || x['用法'] || x['用法用量'] || '';
+    var joined = [name, dose, usage].map(function(s) { return String(s).trim(); }).filter(Boolean).join(' ');
+    return joined || JSON.stringify(x);
+  }
+  return String(x).trim();
+}
+
 // 内服薬を配列に変換（配列/JSON文字列/区切り文字列すべて対応）
 function parseMedicinesList(val) {
   if (!val) return [];
   // Already an array
   if (Array.isArray(val)) {
-    return val.map(function(s) { return String(s).trim(); }).filter(Boolean);
+    return val.map(normalizeMedItem).filter(Boolean);
   }
   var s = String(val).trim();
   if (!s) return [];
@@ -1366,7 +1379,7 @@ function parseMedicinesList(val) {
     try {
       var arr = JSON.parse(s);
       if (Array.isArray(arr)) {
-        return arr.map(function(x) { return String(x).trim(); }).filter(Boolean);
+        return arr.map(normalizeMedItem).filter(Boolean);
       }
     } catch(e) {}
   }
@@ -1802,15 +1815,7 @@ async function analyzeMedicinePhoto() {
       newMeds = rawText.split('\n').map(function(l) { return l.replace(/^\d+[\.\)]\s*/, '').trim(); }).filter(Boolean);
     }
     // 各要素をオブジェクト→文字列に正規化
-    newMeds = newMeds.map(function(item) {
-      if (typeof item === 'string') return item.trim();
-      if (item && typeof item === 'object') {
-        // { name, dose, instructions } 等の形に対応
-        return [item.name || item.drug_name || item.drug || '', item.dose || item.dosage || '', item.instructions || item.frequency || item.timing || item.usage || '']
-          .map(function(s) { return String(s).trim(); }).filter(Boolean).join(' ');
-      }
-      return String(item).trim();
-    }).filter(Boolean);
+    newMeds = newMeds.map(normalizeMedItem).filter(Boolean);
 
     // 既存行と結合
     var currentArr = parseMedicinesList(getMedicinesFromRows('reg-medicines-rows'));
