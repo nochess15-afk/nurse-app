@@ -1848,9 +1848,17 @@ function clearRegForm() {
     var el = document.getElementById(id);
     if (el) el.value = '';
   });
-  // degree-btn ボタンをリセット
   document.querySelectorAll('.degree-btn').forEach(function(b) { b.classList.remove('active'); });
   document.getElementById('obs-card').style.display = 'none';
+  // 指示書読み取りエリアをリセット
+  var docMsgs = document.getElementById('doc-chat-messages');
+  if (docMsgs) docMsgs.innerHTML = '';
+  var docLabel = document.getElementById('doc-attach-label');
+  if (docLabel) docLabel.textContent = '写真またはPDFを添付してください';
+  var docPhoto = document.getElementById('doc-photo');
+  if (docPhoto) docPhoto.value = '';
+  window._docParsed = null;
+  window._docNormalizedMedicines = null;
 }
 
 // ===== 職種切り替え =====
