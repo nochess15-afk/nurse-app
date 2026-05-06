@@ -1610,6 +1610,7 @@ async function savePatient() {
     // ② Supabase insert/upsert
     console.log('[savePatient] ② Supabase登録開始');
     var savedId = null;
+    var wasEditing = !!window.editingPatientId;
     if (window.editingPatientId) {
       await supabaseFetch('patients?id=eq.' + window.editingPatientId, 'PATCH', patientPayload);
       savedId = window.editingPatientId;
@@ -1628,6 +1629,10 @@ async function savePatient() {
     document.getElementById('obs-card').style.display = 'none';
     loadPatients();
     switchTab('patients');
+    if (wasEditing && savedId) {
+      var latest = await supabaseFetch('patients?id=eq.' + savedId);
+      if (latest.length) selectPatient(latest[0]);
+    }
 
     // ④ 薬剤チェック（fire-and-forget・登録をブロックしない）
     if (medicines && savedId) checkMedicinesAsync(savedId, medicines);
@@ -2786,6 +2791,8 @@ async function savePatientOnly() {
       emergency_contact: emergencyContact2 || null
     };
 
+    var wasEditing = !!window.editingPatientId;
+    var savedId = window.editingPatientId || null;
     if (window.editingPatientId) {
       await supabaseFetch('patients?id=eq.' + window.editingPatientId, 'PATCH', payload);
       window.editingPatientId = null;
@@ -2799,6 +2806,10 @@ async function savePatientOnly() {
     clearRegForm();
     loadPatients();
     switchTab('patients');
+    if (wasEditing && savedId) {
+      var latest = await supabaseFetch('patients?id=eq.' + savedId);
+      if (latest.length) selectPatient(latest[0]);
+    }
   } catch(e) {
     showStatus('⚠️ 保存に失敗しました: ' + e.message, 5000);
   } finally {
