@@ -15,7 +15,6 @@
 <title>NurseAIDE</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
 <body>
 
@@ -301,7 +300,7 @@
           <span id="doc-attach-label" style="flex:1;font-size:12px;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">写真またはPDFを添付してください</span>
           <button onclick="analyzeDocument()" style="background:var(--primary);color:white;border:none;border-radius:16px;padding:5px 14px;font-size:13px;cursor:pointer;white-space:nowrap;flex-shrink:0">送信</button>
         </div>
-        <input type="file" id="doc-photo" accept="image/*,application/pdf" style="display:none" onchange="readDocumentFile(this)">
+        <input type="file" id="doc-photo" accept=".pdf,.jpg,.jpeg,.png" style="display:none" onchange="readDocumentFile(this)">
       </div>
 
       <div class="form-grid">
