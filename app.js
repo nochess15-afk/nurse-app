@@ -2924,6 +2924,7 @@ async function analyzeDocument() {
 
   try {
     var isPdfSend = sendMime === 'application/pdf';
+    var isLowTextPdf = false;
     var requestSystem, requestMessages;
 
     if (isPdfSend) {
@@ -2939,16 +2940,14 @@ async function analyzeDocument() {
       console.log('[analyzeDocument] PDF抽出テキスト全文:', allText);
       console.log('[analyzeDocument] PDF抽出テキスト長=', allText.length, '先頭200:', allText.substring(0, 200));
 
-      if (allText.length < 50) {
-        loadWrap.remove();
-        docChatAddMessage('ai', '⚠️ 手書きPDFは自動読み取りに対応していません。手動で入力してください。');
-        return;
-      }
+      isLowTextPdf = allText.length < 50;
 
       requestSystem = 'あなたは訪問看護指示書のテキストから患者情報を抽出するAIです。JSONのみで返答。';
       requestMessages = [{
         role: 'user',
-        content: '以下の訪問看護指示書テキストから情報を抽出してください：\n\n' + allText + '\n\n以下のJSON形式で返答（medicinesは1薬剤1要素の配列）：{"name":"患者氏名","furigana":"ふりがな","age":"年齢","gender":"男性 or 女性","diagnosis1":"傷病名①","diagnosis2":"傷病名②","diagnosis3":"傷病名③","adl":"寝たきり度","dementia":"認知症の状況","medicines":["薬剤名 用量 用法","薬剤名 用量 用法"],"notes":"療養生活の留意事項","rehabilitation":"リハビリ指示内容","history":""}'
+        content: '以下の訪問看護指示書テキストから情報を抽出してください：\n\n' + allText +
+          (isLowTextPdf ? '\n\nこのPDFは手書きまたは画像PDFの可能性があります。読み取り結果が不正確な場合があります。' : '') +
+          '\n\n以下のJSON形式で返答（medicinesは1薬剤1要素の配列）：{"name":"患者氏名","furigana":"ふりがな","age":"年齢","gender":"男性 or 女性","diagnosis1":"傷病名①","diagnosis2":"傷病名②","diagnosis3":"傷病名③","adl":"寝たきり度","dementia":"認知症の状況","medicines":["薬剤名 用量 用法","薬剤名 用量 用法"],"notes":"療養生活の留意事項","rehabilitation":"リハビリ指示内容","history":""}'
       }];
     } else {
       requestSystem = 'You are reading a Japanese home visit nursing instruction form. Reply only in JSON. No markdown.';
@@ -3037,7 +3036,10 @@ async function analyzeDocument() {
     if (parsed.notes)             lines.push('留意事項：' + parsed.notes);
     if (parsed.rehabilitation)    lines.push('リハビリ：' + parsed.rehabilitation);
 
-    var summaryHtml = '以下の内容で読み取りました。確認してください：<br><br>' +
+    var warningPrefix = isLowTextPdf
+      ? '⚠️ 手書きまたは画像PDFのため、読み取り結果が不正確な場合があります。必ず内容を確認してください。<br><br>'
+      : '';
+    var summaryHtml = warningPrefix + '以下の内容で読み取りました。確認してください：<br><br>' +
       lines.map(function(l) { return '<span style="display:block">' + l + '</span>'; }).join('') +
       '<br><button onclick="docChatApplyForm()" style="background:var(--primary);color:white;border:none;border-radius:8px;padding:8px 16px;font-size:13px;cursor:pointer;width:100%;margin-top:4px">📝 フォームに入力する</button>';
     docChatAddMessage('ai', summaryHtml);
