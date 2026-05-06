@@ -776,6 +776,19 @@ async function selectPatient(p) {
   if (consDisp) consDisp.textContent = '清明';
   var cons = document.getElementById('vt-consciousness');
   if (cons) cons.value = '清明';
+
+  // 患者切り替え時は計画書・報告書の生成コンテンツをクリア
+  var keikakuResult = document.getElementById('keikaku-result');
+  if (keikakuResult) keikakuResult.style.display = 'none';
+  ['k-date-display','k-kubun-display','k-mokuhyo','k-date-col','k-content-col','k-hyoka-col'].forEach(function(id) {
+    var el = document.getElementById(id); if (el) el.textContent = '';
+  });
+  var reportCard = document.getElementById('report-card');
+  if (reportCard) reportCard.style.display = 'none';
+  ['r-vital','r-keika'].forEach(function(id) {
+    var el = document.getElementById(id); if (el) el.textContent = '';
+  });
+
   showKarteView();
 }
 
