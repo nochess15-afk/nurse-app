@@ -2842,63 +2842,166 @@ function docChatAddMessage(role, html) {
 function readDocumentFile(input) {
   var file = input.files[0];
   if (!file) return;
-
-  console.log('[readDocumentFile] file.name=', file.name, 'file.type=', file.type, 'file.size=', file.size);
+  input.value = '';
 
   var isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
 
   if (!isPdf && file.type && !file.type.startsWith('image/')) {
     docChatAddMessage('ai', '⚠️ 画像またはPDFファイルを選択してください。');
-    input.value = '';
     return;
   }
-
   if (file.size > 6 * 1024 * 1024) {
     var mb = Math.round(file.size / 1024 / 1024 * 10) / 10;
     docChatAddMessage('ai', '⚠️ ファイルが大きすぎます（' + mb + 'MB）。写真を撮り直すか圧縮してください。');
-    input.value = '';
     return;
   }
 
-  docChatFileName = file.name;
-  docChatFileMime = isPdf ? 'application/pdf' : (file.type || 'image/jpeg');
-
   if (isPdf) {
-    var reader = new FileReader();
-    reader.onload = function(e) {
-      console.log('[FileReader.onload] PDF arrayBuffer length=', e.target.result ? e.target.result.byteLength : 'null');
-      docChatFileData = e.target.result;
-      console.log('[readDocumentFile] PDF読み込み完了 ≈' + Math.round(e.target.result.byteLength / 1024) + 'KB');
-      document.getElementById('doc-attach-label').textContent = file.name + ' ✅';
-    };
-    reader.onerror = function() {
-      console.log('[FileReader.onerror] error=', reader.error);
-      docChatAddMessage('ai', '⚠️ PDFの読み込みに失敗しました。別のファイルを選択してください。');
-      docChatFileData = null;
-      input.value = '';
-    };
-    reader.readAsArrayBuffer(file);
+    processPdfFile(file);
   } else {
+    docChatFileName = file.name;
+    docChatFileMime = file.type || 'image/jpeg';
     var reader = new FileReader();
     reader.onload = function(e) {
-      console.log('[FileReader.onload] result length=', e.target.result ? e.target.result.length : 'null');
       docChatFileData = e.target.result.split(',')[1];
-      console.log('[readDocumentFile] 画像読み込み完了 ≈' + Math.round(docChatFileData.length * 3 / 4 / 1024) + 'KB mime=' + docChatFileMime);
       document.getElementById('doc-attach-label').textContent = file.name + ' ✅';
     };
     reader.onerror = function() {
-      console.log('[FileReader.onerror] error=', reader.error);
       docChatAddMessage('ai', '⚠️ 画像の読み込みに失敗しました。別の写真を選択してください。');
       docChatFileData = null;
-      input.value = '';
     };
     reader.readAsDataURL(file);
   }
 }
 
+async function processPdfFile(file) {
+  document.getElementById('doc-attach-label').textContent = '読み取り中...';
+  clearRegForm();
+  var loadWrap = docChatAddMessage('ai', '<span class="loading-dot"><span></span><span></span><span></span></span> 読み取り中...');
+
+  try {
+    if (typeof pdfjsLib === 'undefined') throw new Error('PDF.jsが読み込まれていません');
+
+    var arrayBuf = await new Promise(function(resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function(e) { resolve(e.target.result); };
+      reader.onerror = function() { reject(new Error('ファイル読み込みエラー')); };
+      reader.readAsArrayBuffer(file);
+    });
+
+    var typedArray = new Uint8Array(arrayBuf);
+    var pdfDoc = await pdfjsLib.getDocument({ data: typedArray }).promise;
+    var allText = '';
+    for (var pg = 1; pg <= pdfDoc.numPages; pg++) {
+      var page = await pdfDoc.getPage(pg);
+      var tc = await page.getTextContent();
+      allText += tc.items.map(function(i) { return i.str; }).join(' ') + '\n';
+    }
+    allText = allText.trim();
+    console.log('[processPdfFile] テキスト長=', allText.length, '先頭200:', allText.substring(0, 200));
+
+    if (allText.length < 100) {
+      loadWrap.remove();
+      docChatAddMessage('ai', '⚠️ このPDFは読み取れません（手書き・画像PDFは非対応）');
+      document.getElementById('doc-attach-label').textContent = '写真またはPDFを添付してください';
+      return;
+    }
+
+    var prompt = '以下のテキストは訪問看護指示書から抽出したテキストです。以下のJSONフォーマットで情報を返してください。必ずJSON単体で返し、前後の説明文・マークダウンは不要です。\n\n' + allText + '\n\n{\n  "name": "患者氏名",\n  "furigana": "ふりがな（不明なら空文字）",\n  "birthdate": "生年月日（YYYY-MM-DD形式）",\n  "age": 0,\n  "gender": "男性 or 女性（不明なら空文字）",\n  "main_diagnosis": "主たる傷病名1つ目",\n  "diagnosis2": "傷病名2つ目（なければ空文字）",\n  "diagnosis3": "傷病名3つ目（なければ空文字）",\n  "adl": "寝たきり度（J1/J2/A1/A2/B1/B2/C1/C2のうちチェックされているもの）",\n  "dementia_status": "認知症の状況（I/IIa/IIb/IIIa/IIIb/IV/Mのうちチェックされているもの、自立なら空文字）",\n  "medical_procedures": "留意事項・指示事項の内容",\n  "medicines": ["薬剤名1", "薬剤名2"],\n  "rehabilitation_instructions": "リハビリ指示内容（なければ空文字）",\n  "notes": "特記すべき留意事項（なければ空文字）"\n}';
+
+    var response = await fetch('https://nurse-aide-claude.nochess15.workers.dev', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: CLAUDE_MODEL,
+        max_tokens: 2000,
+        system: 'あなたは訪問看護指示書から患者情報を抽出するAIです。JSONのみで返答してください。前置き・説明・マークダウンは不要です。',
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    loadWrap.remove();
+    var data = await response.json().catch(function() { return null; });
+
+    if (!response.ok || (data && data.error)) {
+      var errMsg = (data && data.error && data.error.message) ? data.error.message : String(response.status);
+      docChatAddMessage('ai', '⚠️ APIエラー: ' + errMsg);
+      document.getElementById('doc-attach-label').textContent = '写真またはPDFを添付してください';
+      return;
+    }
+
+    if (!data || !data.content || !data.content[0] || !data.content[0].text) {
+      docChatAddMessage('ai', '⚠️ AIからの応答が空でした。もう一度お試しください。');
+      document.getElementById('doc-attach-label').textContent = '写真またはPDFを添付してください';
+      return;
+    }
+
+    var result = data.content[0].text;
+    var parsed = null;
+    var jsonMatch = result.replace(/```json|```/g, '').trim().match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      try { parsed = JSON.parse(jsonMatch[0]); } catch(e) { console.error('[processPdfFile] JSONパース失敗:', e); }
+    }
+
+    if (!parsed) {
+      docChatAddMessage('ai', '⚠️ 読み取りに失敗しました。内容を確認して再度お試しください。');
+      document.getElementById('doc-attach-label').textContent = '写真またはPDFを添付してください';
+      return;
+    }
+
+    var meds = [];
+    if (Array.isArray(parsed.medicines)) {
+      meds = parsed.medicines.map(function(item) {
+        if (typeof item === 'string') return item.trim();
+        if (item && typeof item === 'object') {
+          var parts = [
+            item.name || item.drug_name || item.drug || item['薬剤名'] || '',
+            item.dose || item.dosage || item['用量'] || '',
+            item.usage || item.instructions || item['用法'] || ''
+          ];
+          return parts.filter(Boolean).join(' ').trim();
+        }
+        return String(item);
+      }).filter(Boolean);
+    } else if (parsed.medicines) {
+      meds = parseMedicinesList(parsed.medicines);
+    }
+
+    window._docParsed = parsed;
+    window._docNormalizedMedicines = meds;
+
+    var lines = [];
+    if (parsed.name)                        lines.push('氏名：' + parsed.name);
+    if (parsed.furigana)                    lines.push('ふりがな：' + parsed.furigana);
+    if (parsed.age)                         lines.push('年齢：' + parsed.age + '歳');
+    if (parsed.gender)                      lines.push('性別：' + parsed.gender);
+    if (parsed.main_diagnosis)              lines.push('傷病名①：' + parsed.main_diagnosis);
+    if (parsed.diagnosis2)                  lines.push('傷病名②：' + parsed.diagnosis2);
+    if (parsed.diagnosis3)                  lines.push('傷病名③：' + parsed.diagnosis3);
+    if (parsed.adl)                         lines.push('寝たきり度：' + parsed.adl);
+    if (parsed.dementia_status)             lines.push('認知症：' + parsed.dementia_status);
+    if (meds.length)                        lines.push('薬剤：' + meds.join('、'));
+    if (parsed.medical_procedures)          lines.push('留意事項：' + parsed.medical_procedures);
+    if (parsed.rehabilitation_instructions) lines.push('リハビリ：' + parsed.rehabilitation_instructions);
+    if (parsed.notes)                       lines.push('特記事項：' + parsed.notes);
+
+    var summaryHtml = '読み取り完了。以下の内容を確認してください：<br><br>' +
+      lines.map(function(l) { return '<span style="display:block">' + l + '</span>'; }).join('') +
+      '<br><button onclick="docChatApplyForm()" style="background:var(--primary);color:white;border:none;border-radius:8px;padding:8px 16px;font-size:13px;cursor:pointer;width:100%;margin-top:4px">📝 フォームに入力する</button>';
+    docChatAddMessage('ai', summaryHtml);
+    document.getElementById('doc-attach-label').textContent = '写真またはPDFを添付してください';
+
+  } catch(e) {
+    if (loadWrap && loadWrap.parentNode) loadWrap.remove();
+    console.error('[processPdfFile] エラー:', e);
+    docChatAddMessage('ai', '⚠️ 読み取りに失敗しました: ' + e.message);
+    document.getElementById('doc-attach-label').textContent = '写真またはPDFを添付してください';
+  }
+}
+
 async function analyzeDocument() {
   if (!docChatFileData) {
-    docChatAddMessage('ai', '⚠️ 先に写真またはPDFを添付してください。');
+    docChatAddMessage('ai', '⚠️ 先に写真を添付してください。');
     return;
   }
 
@@ -2913,69 +3016,32 @@ async function analyzeDocument() {
   document.getElementById('doc-attach-label').textContent = '写真またはPDFを添付してください';
   document.getElementById('doc-photo').value = '';
 
-  var area = document.getElementById('doc-chat-messages');
-  var loadWrap = document.createElement('div');
-  loadWrap.style.cssText = 'display:flex;justify-content:flex-start';
-  loadWrap.innerHTML = '<div style="background:white;border:1px solid var(--border);border-radius:12px;border-bottom-left-radius:3px;padding:8px 12px;font-size:13px;color:var(--text-secondary)"><span class="loading-dot"><span></span><span></span><span></span></span> 読み取り中...</div>';
-  area.appendChild(loadWrap);
-  area.scrollTop = area.scrollHeight;
-
+  var loadWrap = docChatAddMessage('ai', '<span class="loading-dot"><span></span><span></span><span></span></span> 読み取り中...');
   clearRegForm();
 
   try {
-    var isPdfSend = sendMime === 'application/pdf';
-    var isLowTextPdf = false;
-    var requestSystem, requestMessages;
-
-    if (isPdfSend) {
-      // PDF.jsでテキスト抽出
-      var pdfDoc = await pdfjsLib.getDocument({ data: sendData }).promise;
-      var allText = '';
-      for (var p = 1; p <= pdfDoc.numPages; p++) {
-        var page = await pdfDoc.getPage(p);
-        var tc = await page.getTextContent();
-        allText += tc.items.map(function(i) { return i.str; }).join(' ') + '\n';
-      }
-      allText = allText.trim();
-      console.log('[analyzeDocument] PDF抽出テキスト全文:', allText);
-      console.log('[analyzeDocument] PDF抽出テキスト長=', allText.length, '先頭200:', allText.substring(0, 200));
-
-      isLowTextPdf = allText.length < 50;
-
-      requestSystem = 'あなたは訪問看護指示書のテキストから患者情報を抽出するAIです。JSONのみで返答。';
-      requestMessages = [{
-        role: 'user',
-        content: '以下の訪問看護指示書テキストから情報を抽出してください：\n\n' + allText +
-          (isLowTextPdf ? '\n\nこのPDFは手書きまたは画像PDFの可能性があります。読み取り結果が不正確な場合があります。' : '') +
-          '\n\n以下のJSON形式で返答（medicinesは1薬剤1要素の配列）：{"name":"患者氏名","furigana":"ふりがな","age":"年齢","gender":"男性 or 女性","diagnosis1":"傷病名①","diagnosis2":"傷病名②","diagnosis3":"傷病名③","adl":"寝たきり度","dementia":"認知症の状況","medicines":["薬剤名 用量 用法","薬剤名 用量 用法"],"notes":"療養生活の留意事項","rehabilitation":"リハビリ指示内容","history":""}'
-      }];
-    } else {
-      requestSystem = 'You are reading a Japanese home visit nursing instruction form. Reply only in JSON. No markdown.';
-      requestMessages = [{
-        role: 'user',
-        content: [
-          { type: 'image', source: { type: 'base64', media_type: sendMime, data: sendData } },
-          { type: 'text', text: 'Read this photo carefully. Extract only what is handwritten or filled in. Return JSON:\n{"name":"kanji name in 患者氏名","furigana":"ふりがな","age":"number","gender":"男性 or 女性","diagnosis1":"傷病名(1)","diagnosis2":"傷病名(2)","diagnosis3":"傷病名(3)","adl":"circle mark in 寝たきり度 J1/J2/A1/A2/B1/B2/C1/C2","dementia":"circle mark in 認知症 Ⅰ/Ⅱa/Ⅱb/Ⅲa/Ⅲb/Ⅳ/M","medicines":["handwritten drug 1 with dosage","handwritten drug 2 with dosage"],"notes":"handwritten text in 留意事項","rehabilitation":"handwritten numbers and checked items only","history":""}' }
-        ]
-      }];
-    }
-
     var response = await fetch('https://nurse-aide-claude.nochess15.workers.dev', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache, no-store', 'Pragma': 'no-cache' },
       body: JSON.stringify({
         model: CLAUDE_MODEL,
         max_tokens: 1500,
-        system: requestSystem,
-        messages: requestMessages
+        system: 'You are reading a Japanese home visit nursing instruction form. Reply only in JSON. No markdown.',
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: sendMime, data: sendData } },
+            { type: 'text', text: 'Read this photo carefully. Extract only what is handwritten or filled in. Return JSON:\n{"name":"kanji name","furigana":"ふりがな","age":"number","gender":"男性 or 女性","main_diagnosis":"傷病名(1)","diagnosis2":"傷病名(2)","diagnosis3":"傷病名(3)","adl":"J1/J2/A1/A2/B1/B2/C1/C2","dementia_status":"Ⅰ/Ⅱa/Ⅱb/Ⅲa/Ⅲb/Ⅳ/M or empty","medicines":["drug 1","drug 2"],"medical_procedures":"留意事項","rehabilitation_instructions":"リハビリ指示","notes":""}' }
+          ]
+        }]
       })
     });
 
     loadWrap.remove();
-    var data = await response.json();
+    var data = await response.json().catch(function() { return null; });
 
-    if (!response.ok || data.error) {
-      var errMsg = (data.error && data.error.message) ? data.error.message : String(response.status);
+    if (!response.ok || (data && data.error)) {
+      var errMsg = (data && data.error && data.error.message) ? data.error.message : String(response.status);
       if (errMsg.includes('rate limit') || errMsg.includes('tokens per minute')) {
         docChatAddMessage('ai', '⚠️ アクセスが集中しています。少し待ってから再度お試しください。');
       } else {
@@ -2984,7 +3050,7 @@ async function analyzeDocument() {
       return;
     }
 
-    if (!data.content || !data.content[0] || !data.content[0].text) {
+    if (!data || !data.content || !data.content[0] || !data.content[0].text) {
       docChatAddMessage('ai', '⚠️ AIからの応答が空でした。もう一度お試しください。');
       return;
     }
@@ -3001,51 +3067,49 @@ async function analyzeDocument() {
       return;
     }
 
-    // 薬剤名正規化（失敗時は元配列をそのまま使用）
-    var normalizedMedicines = parseMedicinesList(parsed.medicines);
-    if (normalizedMedicines.length) {
-      try {
-        var medRaw = await callClaude(
-          'あなたは日本の薬剤名の専門家です。OCRで誤認識された薬剤名を正しい日本の薬剤名に修正してください。JSONのみで返答。前置き・マークダウン不要。',
-          '以下はOCRで読み取った薬剤リストです。誤認識と思われる薬剤名を正しい日本の実在する薬剤名に修正してください。修正できない場合はそのままにしてください。\n' + normalizedMedicines.join('\n') + '\n返答形式：{"medicines": ["修正後薬剤1","修正後薬剤2",...]}'
-        );
-        var medJson = medRaw.trim().replace(/^```[a-z]*\n?/, '').replace(/\n?```$/, '');
-        var medResult = JSON.parse(medJson);
-        if (Array.isArray(medResult.medicines)) {
-          normalizedMedicines = medResult.medicines.map(function(s){return String(s).trim();}).filter(Boolean);
-        } else if (medResult.medicines) {
-          normalizedMedicines = parseMedicinesList(medResult.medicines);
+    var meds = [];
+    if (Array.isArray(parsed.medicines)) {
+      meds = parsed.medicines.map(function(item) {
+        if (typeof item === 'string') return item.trim();
+        if (item && typeof item === 'object') {
+          var parts = [
+            item.name || item.drug_name || item.drug || item['薬剤名'] || '',
+            item.dose || item.dosage || item['用量'] || '',
+            item.usage || item.instructions || item['用法'] || ''
+          ];
+          return parts.filter(Boolean).join(' ').trim();
         }
-      } catch(e) { console.warn('[analyzeDocument] 薬剤名正規化失敗:', e); }
+        return String(item);
+      }).filter(Boolean);
+    } else if (parsed.medicines) {
+      meds = parseMedicinesList(parsed.medicines);
     }
 
     window._docParsed = parsed;
-    window._docNormalizedMedicines = normalizedMedicines;
+    window._docNormalizedMedicines = meds;
 
     var lines = [];
-    if (parsed.name)              lines.push('氏名：' + parsed.name);
-    if (parsed.furigana)          lines.push('ふりがな：' + parsed.furigana);
-    if (parsed.age)               lines.push('年齢：' + parsed.age + '歳');
-    if (parsed.gender)            lines.push('性別：' + parsed.gender);
-    if (parsed.diagnosis1)        lines.push('傷病名①：' + parsed.diagnosis1);
-    if (parsed.diagnosis2)        lines.push('傷病名②：' + parsed.diagnosis2);
-    if (parsed.diagnosis3)        lines.push('傷病名③：' + parsed.diagnosis3);
-    if (parsed.adl)               lines.push('寝たきり度：' + parsed.adl);
-    if (parsed.dementia)          lines.push('認知症：' + parsed.dementia);
-    if (normalizedMedicines.length) lines.push('薬剤：' + normalizedMedicines.join('、'));
-    if (parsed.notes)             lines.push('留意事項：' + parsed.notes);
-    if (parsed.rehabilitation)    lines.push('リハビリ：' + parsed.rehabilitation);
+    if (parsed.name)                        lines.push('氏名：' + parsed.name);
+    if (parsed.furigana)                    lines.push('ふりがな：' + parsed.furigana);
+    if (parsed.age)                         lines.push('年齢：' + parsed.age + '歳');
+    if (parsed.gender)                      lines.push('性別：' + parsed.gender);
+    if (parsed.main_diagnosis)              lines.push('傷病名①：' + parsed.main_diagnosis);
+    if (parsed.diagnosis2)                  lines.push('傷病名②：' + parsed.diagnosis2);
+    if (parsed.diagnosis3)                  lines.push('傷病名③：' + parsed.diagnosis3);
+    if (parsed.adl)                         lines.push('寝たきり度：' + parsed.adl);
+    if (parsed.dementia_status)             lines.push('認知症：' + parsed.dementia_status);
+    if (meds.length)                        lines.push('薬剤：' + meds.join('、'));
+    if (parsed.medical_procedures)          lines.push('留意事項：' + parsed.medical_procedures);
+    if (parsed.rehabilitation_instructions) lines.push('リハビリ：' + parsed.rehabilitation_instructions);
+    if (parsed.notes)                       lines.push('特記事項：' + parsed.notes);
 
-    var warningPrefix = isLowTextPdf
-      ? '⚠️ 手書きまたは画像PDFのため、読み取り結果が不正確な場合があります。必ず内容を確認してください。<br><br>'
-      : '';
-    var summaryHtml = warningPrefix + '以下の内容で読み取りました。確認してください：<br><br>' +
+    var summaryHtml = '読み取り完了。以下の内容を確認してください：<br><br>' +
       lines.map(function(l) { return '<span style="display:block">' + l + '</span>'; }).join('') +
       '<br><button onclick="docChatApplyForm()" style="background:var(--primary);color:white;border:none;border-radius:8px;padding:8px 16px;font-size:13px;cursor:pointer;width:100%;margin-top:4px">📝 フォームに入力する</button>';
     docChatAddMessage('ai', summaryHtml);
 
   } catch(e) {
-    loadWrap.remove();
+    if (loadWrap && loadWrap.parentNode) loadWrap.remove();
     console.error('[analyzeDocument] エラー:', e);
     docChatAddMessage('ai', '⚠️ 読み取りに失敗しました: ' + e.message);
   }
@@ -3055,17 +3119,20 @@ function docChatApplyForm() {
   var parsed = window._docParsed || {};
   var normalizedMedicines = window._docNormalizedMedicines || [];
 
-  if (parsed.name)        document.getElementById('reg-name').value = parsed.name;
-  if (parsed.furigana)    document.getElementById('reg-furigana').value = parsed.furigana;
-  if (parsed.age)         document.getElementById('reg-age').value = String(parsed.age).replace(/[^0-9]/g, '');
-  if (parsed.gender)      document.getElementById('reg-gender').value = parsed.gender;
-  document.getElementById('reg-diagnosis1').value = parsed.diagnosis1 || '';
+  if (parsed.name)     document.getElementById('reg-name').value = parsed.name;
+  if (parsed.furigana) document.getElementById('reg-furigana').value = parsed.furigana;
+  if (parsed.age)      document.getElementById('reg-age').value = String(parsed.age).replace(/[^0-9]/g, '');
+  if (parsed.gender)   document.getElementById('reg-gender').value = parsed.gender;
+  document.getElementById('reg-diagnosis1').value = parsed.main_diagnosis || parsed.diagnosis1 || '';
   document.getElementById('reg-diagnosis2').value = parsed.diagnosis2 || '';
   document.getElementById('reg-diagnosis3').value = parsed.diagnosis3 || '';
-  if (parsed.adl)         setDegreeBtn('reg-adl-degree', parsed.adl);
-  if (parsed.dementia)    setDegreeBtn('reg-dementia', parsed.dementia);
-  if (parsed.notes)       document.getElementById('reg-notes').value = parsed.notes;
-  if (parsed.rehabilitation) document.getElementById('reg-rehabilitation').value = parsed.rehabilitation;
+  if (parsed.adl)             setDegreeBtn('reg-adl-degree', parsed.adl);
+  if (parsed.dementia_status) setDegreeBtn('reg-dementia', parsed.dementia_status);
+  else if (parsed.dementia)   setDegreeBtn('reg-dementia', parsed.dementia);
+  var notesText = [parsed.medical_procedures, parsed.notes].filter(Boolean).join('\n');
+  if (notesText) document.getElementById('reg-notes').value = notesText;
+  var rehabText = parsed.rehabilitation_instructions || parsed.rehabilitation || '';
+  if (rehabText) document.getElementById('reg-rehabilitation').value = rehabText;
   if (normalizedMedicines.length) renderMedicineRows('reg-medicines-rows', JSON.stringify(normalizedMedicines));
 
   docChatAddMessage('ai', '✅ フォームに入力しました。内容を確認して保存してください。');
