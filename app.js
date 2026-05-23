@@ -781,13 +781,19 @@ async function selectPatient(p) {
   var keikakuResult = document.getElementById('keikaku-result');
   if (keikakuResult) keikakuResult.style.display = 'none';
   ['k-date-display','k-kubun-display','k-mokuhyo','k-date-col','k-content-col','k-hyoka-col'].forEach(function(id) {
-    var el = document.getElementById(id); if (el) el.textContent = '';
+    var el = document.getElementById(id); if (el) el.innerHTML = '';
   });
+  var keikakuKubun = document.getElementById('keikaku-kubun');
+  if (keikakuKubun) keikakuKubun.selectedIndex = 0;
   var reportCard = document.getElementById('report-card');
   if (reportCard) reportCard.style.display = 'none';
   ['r-vital','r-keika'].forEach(function(id) {
-    var el = document.getElementById(id); if (el) el.textContent = '';
+    var el = document.getElementById(id); if (el) el.innerHTML = '';
   });
+  var rehabOutput = document.getElementById('rehab-plan-output');
+  if (rehabOutput) rehabOutput.style.display = 'none';
+  var rehabContent = document.getElementById('rehab-plan-content');
+  if (rehabContent) rehabContent.innerHTML = '';
 
   showKarteView();
 }
